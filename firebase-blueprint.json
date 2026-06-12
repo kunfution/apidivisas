@@ -23,12 +23,36 @@
         }
       },
       "required": ["bcvEuro", "bcvUsd", "binanceUsdt", "lastUpdated"]
+    },
+    "DailyHistory": {
+      "title": "DailyHistory",
+      "description": "Accumulation of 10-minute rate points saved for a single day",
+      "type": "object",
+      "properties": {
+        "dateString": {
+          "type": "string",
+          "description": "Date of the recorded points (YYYY-MM-DD)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Last update timestamp"
+        },
+        "points": {
+          "type": "array",
+          "description": "Array of rate measurement frames recorded during the day"
+        }
+      },
+      "required": ["dateString", "timestamp", "points"]
     }
   },
   "firestore": {
     "exchangeRates/{rateDocId}": {
       "schema": "ExchangeRate",
       "description": "Collection storing the current exchange rates"
+    },
+    "dailyHistory/{dateDocId}": {
+      "schema": "DailyHistory",
+      "description": "Optimized daily history aggregation for visual charting"
     }
   }
 }

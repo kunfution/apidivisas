@@ -47,6 +47,11 @@ export default function App() {
   const [isScraping, setIsScraping] = useState(false);
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   
+  // Display filters in the chart
+  const [showUsd, setShowUsd] = useState(true);
+  const [showEuro, setShowEuro] = useState(true);
+  const [showUsdt, setShowUsdt] = useState(true);
+  
   // Real-time domestic VET clock state
   const [vetTime, setVetTime] = useState({ date: '--/--/----', time: '00:00:00' });
 
@@ -412,13 +417,51 @@ export default function App() {
 
           {/* Interactive Historical Rate Area chart */}
           <div id="chart-panel" className="bg-[#0d1117] border border-slate-800 rounded-xl p-6 space-y-4 shadow-sm">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/60 pb-3">
               <div>
                 <h3 className="font-bold text-white text-base">Historial de Tendencia de Tasas</h3>
                 <p className="text-xs text-slate-500">Sincronización cronológica de lecturas en Firestore</p>
               </div>
-              <div className="flex items-center gap-1 bg-[#161b22] border border-slate-800 p-1 rounded-xl text-xs font-semibold">
-                <span className="p-1 px-3 rounded-lg text-slate-400">Dólar BCV y USDT</span>
+              
+              {/* Interactive visibility filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mr-1">Mostrar:</span>
+                
+                <button 
+                  onClick={() => setShowUsd(!showUsd)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                    showUsd 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]' 
+                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${showUsd ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
+                  USD BCV
+                </button>
+
+                <button 
+                  onClick={() => setShowEuro(!showEuro)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                    showEuro 
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]' 
+                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${showEuro ? 'bg-blue-400' : 'bg-slate-600'}`}></span>
+                  EUR BCV
+                </button>
+
+                <button 
+                  onClick={() => setShowUsdt(!showUsdt)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                    showUsdt 
+                      ? 'bg-amber-500/10 text-amber-450 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]' 
+                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${showUsdt ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
+                  USDT P2P
+                </button>
               </div>
             </div>
 
@@ -430,6 +473,10 @@ export default function App() {
                       <linearGradient id="colorUsd" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
                         <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorEuro" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                       </linearGradient>
                       <linearGradient id="colorUsdt" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2}/>
@@ -453,8 +500,15 @@ export default function App() {
                     <Tooltip 
                       contentStyle={{ background: '#0a0c10', border: '1px solid #1f2937', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
                     />
-                    <Area type="monotone" name="USD BCV" dataKey="bcvUsd" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsd)" />
-                    <Area type="monotone" name="USDT Binance" dataKey="binanceUsdt" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsdt)" />
+                    {showUsd && (
+                      <Area type="monotone" name="USD BCV" dataKey="bcvUsd" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsd)" />
+                    )}
+                    {showEuro && (
+                      <Area type="monotone" name="EUR BCV" dataKey="bcvEuro" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#colorEuro)" />
+                    )}
+                    {showUsdt && (
+                      <Area type="monotone" name="USDT Binance" dataKey="binanceUsdt" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsdt)" />
+                    )}
                   </AreaChart>
                 </ResponsiveContainer>
               ) : (
