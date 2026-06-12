@@ -1,0 +1,34 @@
+{
+  "entities": {
+    "ExchangeRate": {
+      "title": "ExchangeRate",
+      "description": "Official exchange rates for USD, EUR, and Binance P2P USDT",
+      "type": "object",
+      "properties": {
+        "bcvEuro": {
+          "type": "number",
+          "description": "BCV Euro rate in VES"
+        },
+        "bcvUsd": {
+          "type": "number",
+          "description": "BCV USD rate in VES"
+        },
+        "binanceUsdt": {
+          "type": "number",
+          "description": "Binance P2P USDT rate in VES"
+        },
+        "lastUpdated": {
+          "type": "string",
+          "description": "Date of last update (YYYY-MM-DD)"
+        }
+      },
+      "required": ["bcvEuro", "bcvUsd", "binanceUsdt", "lastUpdated"]
+    }
+  },
+  "firestore": {
+    "exchangeRates/{rateDocId}": {
+      "schema": "ExchangeRate",
+      "description": "Collection storing the current exchange rates"
+    }
+  }
+}
