@@ -52,6 +52,9 @@ export default function App() {
   const [showEuro, setShowEuro] = useState(true);
   const [showUsdt, setShowUsdt] = useState(true);
   
+  // Historical chart range filter: '1d' | '7d' | '30d' | '1y'
+  const [timeframe, setTimeframe] = useState<'1d' | '7d' | '30d' | '1y'>('30d');
+  
   // Real-time domestic VET clock state
   const [vetTime, setVetTime] = useState({ date: '--/--/----', time: '00:00:00' });
 
@@ -69,9 +72,9 @@ export default function App() {
   };
 
   // 2. Fetch history for charting
-  const fetchHistory = async () => {
+  const fetchHistory = async (range: string = timeframe) => {
     try {
-      const res = await fetch('/api/history');
+      const res = await fetch(`/api/history?range=${range}`);
       const json = await res.json();
       if (json.success && json.history) {
         setHistory(json.history);
@@ -80,6 +83,11 @@ export default function App() {
       console.error('Error fetching history:', err);
     }
   };
+
+  // Automatically fetch history when timeframe shifts
+  useEffect(() => {
+    fetchHistory(timeframe);
+  }, [timeframe]);
 
   // 3. Fetch server logs terminal
   const fetchLogs = async () => {
@@ -118,7 +126,7 @@ export default function App() {
         // Refresh all states immediately
         await Promise.all([
           fetchCurrentRates(),
-          fetchHistory(),
+          fetchHistory(timeframe),
           fetchLogs(),
           fetchServerStatus()
         ]);
@@ -164,7 +172,7 @@ export default function App() {
     const loadAll = async () => {
       await Promise.all([
         fetchCurrentRates(),
-        fetchHistory(),
+        fetchHistory(timeframe),
         fetchLogs(),
         fetchServerStatus()
       ]);
@@ -417,51 +425,72 @@ export default function App() {
 
           {/* Interactive Historical Rate Area chart */}
           <div id="chart-panel" className="bg-[#0d1117] border border-slate-800 rounded-xl p-6 space-y-4 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/60 pb-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800/60 pb-3">
               <div>
                 <h3 className="font-bold text-white text-base">Historial de Tendencia de Tasas</h3>
                 <p className="text-xs text-slate-500">Sincronización cronológica de lecturas en Firestore</p>
               </div>
               
-              {/* Interactive visibility filters */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mr-1">Mostrar:</span>
-                
-                <button 
-                  onClick={() => setShowUsd(!showUsd)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
-                    showUsd 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]' 
-                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${showUsd ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
-                  USD BCV
-                </button>
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Rango de tiempo para el Historial (1D, 7D, 1M, 1A) */}
+                <div className="flex p-0.5 bg-[#0a0c10] border border-slate-800 rounded-lg">
+                  {(['1d', '7d', '30d', '1y'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setTimeframe(t)}
+                      className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all duration-200 cursor-pointer select-none ${
+                        timeframe === t
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.12)]'
+                          : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                      }`}
+                    >
+                      {t === '1d' ? '1 Día' : t === '7d' ? '7 Días' : t === '30d' ? '1 Mes' : '1 Año'}
+                    </button>
+                  ))}
+                </div>
 
-                <button 
-                  onClick={() => setShowEuro(!showEuro)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
-                    showEuro 
-                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]' 
-                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${showEuro ? 'bg-blue-400' : 'bg-slate-600'}`}></span>
-                  EUR BCV
-                </button>
+                <div className="hidden sm:block w-px h-6 bg-slate-800"></div>
 
-                <button 
-                  onClick={() => setShowUsdt(!showUsdt)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
-                    showUsdt 
-                      ? 'bg-amber-500/10 text-amber-450 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]' 
-                      : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
-                  }`}
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${showUsdt ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
-                  USDT P2P
-                </button>
+                {/* Interactive visibility filters */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mr-1">Mostrar:</span>
+                  
+                  <button 
+                    onClick={() => setShowUsd(!showUsd)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                      showUsd 
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]' 
+                        : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${showUsd ? 'bg-emerald-400' : 'bg-slate-600'}`}></span>
+                    USD BCV
+                  </button>
+
+                  <button 
+                    onClick={() => setShowEuro(!showEuro)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                      showEuro 
+                        ? 'bg-blue-500/10 text-blue-400 border-blue-500/30 shadow-[0_0_8px_rgba(59,130,246,0.15)]' 
+                        : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${showEuro ? 'bg-blue-400' : 'bg-slate-600'}`}></span>
+                    EUR BCV
+                  </button>
+
+                  <button 
+                    onClick={() => setShowUsdt(!showUsdt)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer select-none ${
+                      showUsdt 
+                        ? 'bg-amber-500/10 text-amber-450 border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]' 
+                        : 'bg-slate-900/60 text-slate-500 border-slate-800/80 hover:border-slate-700/80'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${showUsdt ? 'bg-amber-400' : 'bg-slate-600'}`}></span>
+                    USDT P2P
+                  </button>
+                </div>
               </div>
             </div>
 

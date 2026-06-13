@@ -1,12 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Keep exchangeRates and dailyHistory open for read/write so both apps can work seamlessly as requested
+    // Keep exchangeRates open for read/write so both apps can work seamlessly as requested
     match /exchangeRates/{document} {
-      allow read, write: if true;
-    }
-    
-    match /dailyHistory/{document} {
       allow read, write: if true;
     }
     

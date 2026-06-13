@@ -4,7 +4,19 @@ import fs from 'fs';
 import https from 'https';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  limit, 
+  getDocs,
+  arrayUnion,
+  where
+} from 'firebase/firestore';
 import * as cheerio from 'cheerio';
 
 // Initialize Express App
@@ -27,6 +39,15 @@ try {
 // Initialize Firebase Web SDK
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
+
+// In-Memory cache for current rates to eliminate Firestore reads during client polling
+interface RateData {
+  bcvEuro: number;
+  bcvUsd: number;
+  binanceUsdt: number;
+  lastUpdated: string;
+}
+let currentRatesCache: RateData | null = null;
 
 // App operates 100% independent of external AI services
 
@@ -331,183 +352,6 @@ async function fetchBinanceP2P(): Promise<number> {
   }
 }
 
-// Optimized daily document history management to stay within Firebase's free tier
-async function addHistoryPoint(bcvEuro: number, bcvUsd: number, binanceUsdt: number) {
-  const { dateString, timeString } = getVenezuelaTime();
-  try {
-    const dailyDocRef = doc(db, "dailyHistory", dateString);
-    let points: any[] = [];
-    
-    const docSnap = await getDoc(dailyDocRef);
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      if (data && Array.isArray(data.points)) {
-        points = data.points;
-      }
-    }
-    
-    // Append the new measure point
-    points.push({
-      bcvEuro,
-      bcvUsd,
-      binanceUsdt,
-      timestamp: new Date().toISOString(),
-      vetTime: timeString
-    });
-    
-    // Save daily document
-    await setDoc(dailyDocRef, {
-      dateString,
-      timestamp: new Date().toISOString(),
-      points
-    });
-    
-    logSystem('info', `Saved historical rate point to 'dailyHistory/${dateString}' (Points today: ${points.length})`);
-    
-    // Trigger automatic retention check for logs older than 35 days (allows slight margin)
-    await runHistoryCleanup();
-  } catch (err: any) {
-    logSystem('error', `Error writing daily history point: ${err?.message || err}`);
-  }
-}
-
-// Auto-migrate legacy individual records from 'exchangeRates' into optimized dailyHistory document structure
-async function migrateLegacyHistory() {
-  logSystem('info', 'Checking for legacy individual history records in Firestore to migrate to optimized dailyHistory...');
-  try {
-    const querySnapshot = await getDocs(collection(db, "exchangeRates"));
-    const legacyDocs: any[] = [];
-    
-    querySnapshot.forEach((docSnap) => {
-      const id = docSnap.id;
-      if (id !== 'current' && id.startsWith('history_')) {
-        legacyDocs.push({ id, ...docSnap.data() });
-      }
-    });
-
-    if (legacyDocs.length === 0) {
-      logSystem('info', 'No legacy individual history documents found.');
-      return;
-    }
-
-    logSystem('info', `Migration found ${legacyDocs.length} individual legacy history data nodes. Grouping them by day for compaction...`);
-    
-    // Group records by day
-    const groupedByDate: Record<string, any[]> = {};
-    for (const docData of legacyDocs) {
-      let dateStr = docData.lastUpdated;
-      if (!dateStr || typeof dateStr !== 'string') {
-        const match = docData.id.match(/history_(\d{4}-\d{2}-\d{2})_/);
-        if (match) {
-          dateStr = match[1];
-        } else {
-          dateStr = new Date(docData.timestamp || Date.now()).toISOString().split('T')[0];
-        }
-      }
-      
-      if (!groupedByDate[dateStr]) {
-        groupedByDate[dateStr] = [];
-      }
-      
-      groupedByDate[dateStr].push({
-        bcvEuro: docData.bcvEuro || docData.euro || 39.24,
-        bcvUsd: docData.bcvUsd || docData.usd || 36.45,
-        binanceUsdt: docData.binanceUsdt || docData.usdt || 38.05,
-        timestamp: docData.timestamp || new Date().toISOString(),
-        vetTime: docData.vetTime || "00:00:00"
-      });
-    }
-
-    // Save and merge into dailyHistory documents
-    for (const [dateString, points] of Object.entries(groupedByDate)) {
-      const dailyDocRef = doc(db, "dailyHistory", dateString);
-      
-      let existingPoints: any[] = [];
-      const docSnap = await getDoc(dailyDocRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data && Array.isArray(data.points)) {
-          existingPoints = data.points;
-        }
-      }
-      
-      // Merge values eliminating precise duplicates
-      const mergedPoints = [...existingPoints];
-      for (const p of points) {
-        const isDuplicate = mergedPoints.some((mp) => 
-          mp.vetTime === p.vetTime || 
-          Math.abs(new Date(mp.timestamp).getTime() - new Date(p.timestamp).getTime()) < 30000
-        );
-        if (!isDuplicate) {
-          mergedPoints.push(p);
-        }
-      }
-      
-      // Sort points of that day chronologically
-      mergedPoints.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-      
-      await setDoc(dailyDocRef, {
-        dateString,
-        timestamp: new Date().toISOString(),
-        points: mergedPoints
-      });
-      
-      logSystem('info', `Consolidated ${points.length} legacy data points into 'dailyHistory/${dateString}' (Current item size: ${mergedPoints.length})`);
-    }
-
-    // Now delete legacy individual documents to release Firestore storage capacity
-    logSystem('info', `Now performing clean recycling of old individual Firestore entries (${legacyDocs.length} items)...`);
-    for (const docData of legacyDocs) {
-      await deleteDoc(doc(db, "exchangeRates", docData.id));
-    }
-    logSystem('info', 'Firestore transition migration executed and cleaned up successfully!');
-  } catch (err: any) {
-    logSystem('error', `Error during automatic legacy data migration: ${err?.message || err}`);
-  }
-}
-
-// Retain only the last 30 days of daily documents in Firestore
-async function runHistoryCleanup() {
-  try {
-    const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
-    
-    const utcDate = new Date();
-    const vetOffsetMs = -4 * 60 * 60 * 1000;
-    const vetDate = new Date(utcDate.getTime() + vetOffsetMs);
-    
-    // Subtract exactly 30 days to get the oldest date to retain
-    vetDate.setUTCDate(vetDate.getUTCDate() - 30);
-    
-    const year = vetDate.getUTCFullYear();
-    const month = String(vetDate.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(vetDate.getUTCDate()).padStart(2, '0');
-    
-    const thresholdDateString = `${year}-${month}-${day}`;
-    
-    logSystem('info', `Checking dailyHistory logs. Retaining logs from ${thresholdDateString} onwards...`);
-    
-    const querySnapshot = await getDocs(collection(db, "dailyHistory"));
-    let deletedCount = 0;
-    
-    for (const docSnap of querySnapshot.docs) {
-      const docId = docSnap.id; // Formatted YYYY-MM-DD
-      if (docId < thresholdDateString) {
-        await deleteDoc(doc(db, "dailyHistory", docId));
-        deletedCount++;
-        logSystem('info', `Deleted obsolete daily record 'dailyHistory/${docId}'`);
-      }
-    }
-    
-    if (deletedCount > 0) {
-      logSystem('info', `Cleanup completed successfully. Recycled ${deletedCount} obsoleted daily history documents.`);
-    } else {
-      logSystem('info', `Cleanup completed. No logs older than ${thresholdDateString} found.`);
-    }
-  } catch (err: any) {
-    logSystem('error', `Error executing history cleanup checker: ${err?.message || err}`);
-  }
-}
-
 // Full execution flow to scrape and update firestore (updates both BCV and USDT)
 async function runFullScrape() {
   logSystem('info', '======================================');
@@ -521,16 +365,32 @@ async function runFullScrape() {
   
   // Update Firestore main document with exact original format and column naming
   const docRef = doc(db, "exchangeRates", "current");
-  await setDoc(docRef, {
+  const freshRates: RateData = {
     bcvEuro: bcv.euro,
     bcvUsd: bcv.usd,
     binanceUsdt: usdt,
     lastUpdated: dateString
-  });
+  };
+  await setDoc(docRef, freshRates);
+  
+  // Update local memory cache to avoid reads on user requests
+  currentRatesCache = freshRates;
   logSystem('info', `Firestore document 'exchangeRates/current' updated successfully!`);
 
-  // Log in daily timeline aggregation
-  await addHistoryPoint(bcv.euro, bcv.usd, usdt);
+  // Save in daily document bin to heavily reduce reads and document write counts
+  const dailyDocRef = doc(db, "exchangeRates", `daily_${dateString}`);
+  const newReading = {
+    bcvEuro: bcv.euro,
+    bcvUsd: bcv.usd,
+    binanceUsdt: usdt,
+    timestamp: new Date().toISOString(),
+    vetTime: timeString
+  };
+  await setDoc(dailyDocRef, {
+    isDaily: true,
+    timestamp: new Date().toISOString(),
+    readings: arrayUnion(newReading)
+  }, { merge: true });
   
   logSystem('info', 'Exchange rate job completed perfectly!');
   logSystem('info', '======================================');
@@ -538,10 +398,10 @@ async function runFullScrape() {
   return { bcvEuro: bcv.euro, bcvUsd: bcv.usd, binanceUsdt: usdt, lastUpdated: dateString };
 }
 
-// Separate routine for USDT-only automatic updates every 10 minutes
+// Separate routine for USDT-only automatic updates every 5 minutes
 async function runUsdtOnlyUpdate() {
   logSystem('info', '--------------------------------------');
-  logSystem('info', 'Starting automatic 10-minute Binance P2P USDT update...');
+  logSystem('info', 'Starting automatic 5-minute Binance P2P USDT update...');
   
   try {
     const usdt = await fetchBinanceP2P();
@@ -567,11 +427,35 @@ async function runUsdtOnlyUpdate() {
     await setDoc(docRef, {
       binanceUsdt: usdt
     }, { merge: true });
-    
-    logSystem('info', `Firestore 'exchangeRates/current' binanceUsdt merged successfully: ${usdt} VES`);
 
-    // Log update inside the daily aggregation array
-    await addHistoryPoint(currentBcvEuro, currentBcvUsd, usdt);
+    // Update in-memory cache
+    if (currentRatesCache) {
+      currentRatesCache.binanceUsdt = usdt;
+    } else {
+      currentRatesCache = {
+        bcvEuro: currentBcvEuro,
+        bcvUsd: currentBcvUsd,
+        binanceUsdt: usdt,
+        lastUpdated: dateString
+      };
+    }
+    
+    logSystem('info', `Firestore 'exchangeRates/current' binanceUsdt merged successfully: ${usdt} VES and in-memory cache updated`);
+
+    // Save in daily document bin to heavily reduce reads and document write counts
+    const dailyDocRef = doc(db, "exchangeRates", `daily_${dateString}`);
+    const newReading = {
+      bcvEuro: currentBcvEuro,
+      bcvUsd: currentBcvUsd,
+      binanceUsdt: usdt,
+      timestamp: new Date().toISOString(),
+      vetTime: timeString
+    };
+    await setDoc(dailyDocRef, {
+      isDaily: true,
+      timestamp: new Date().toISOString(),
+      readings: arrayUnion(newReading)
+    }, { merge: true });
     
     logSystem('info', 'Automatic background USDT update completed!');
     logSystem('info', '--------------------------------------');
@@ -581,7 +465,7 @@ async function runUsdtOnlyUpdate() {
 }
 
 // ----------------------------------------------------
-// AUTO-VERIFICATION BACKGROUND SYSTEM (3 times a day for BCV + 10 minutes for USDT)
+// AUTO-VERIFICATION BACKGROUND SYSTEM (3 times a day for BCV + 5 minutes for USDT)
 // ----------------------------------------------------
 
 // 1. Target Times for BCV scans: 6:00 AM (06:00), 12:00 PM (12:00), 7:00 PM (19:00) VET
@@ -605,7 +489,7 @@ setInterval(() => {
   }
 }, 15000); // Check every 15 seconds to ensure precision
 
-// 2. Continuous 10-minute poller for USDT (Binance P2P)
+// 2. Continuous 10-minute poller for USDT (Binance P2P) to save Firestore writes
 setInterval(() => {
   runUsdtOnlyUpdate().catch(err => {
     logSystem('error', `Error in background USDT 10-minute poller execution: ${err?.message || err}`);
@@ -619,11 +503,19 @@ setInterval(() => {
 // Get current tracked rates
 app.get('/api/rates', async (req, res) => {
   try {
+    // If we have an in-memory cache, read directly from it to prevent Firestore Read operations
+    if (currentRatesCache) {
+      return res.json({ success: true, data: currentRatesCache });
+    }
+    
+    logSystem('warn', 'Rates cache empty on API request, reading from Firestore...');
     const docRef = doc(db, "exchangeRates", "current");
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      res.json({ success: true, data: docSnap.data() });
+      const data = docSnap.data() as RateData;
+      currentRatesCache = data;
+      res.json({ success: true, data });
     } else {
       res.json({ success: false, message: "No data stored in database yet." });
     }
@@ -658,48 +550,128 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// Fetch historical rate logs (reads from optimized dailyHistory and flattens array for the chart)
+// Fetch historical rate logs from daily binned documents for extreme read optimization
 app.get('/api/history', async (req, res) => {
   try {
-    let querySnapshot = await getDocs(collection(db, "dailyHistory"));
-    
-    // Auto-migrate legacy individual files if no dailyHistory files have been generated yet
-    if (querySnapshot.empty) {
-      logSystem('info', 'No dailyHistory documents exist yet. Initiating automatic legacy node migration...');
-      await migrateLegacyHistory();
-      querySnapshot = await getDocs(collection(db, "dailyHistory"));
+    const range = (req.query.range as string) || '30d';
+    const ratesRef = collection(db, "exchangeRates");
+    let allReadings: any[] = [];
+
+    // Determine query limits to prevent unnecessary Firestore reads
+    let dailyLimit = 31;
+    let legacyLimit = 40;
+    let daysToKeep = 30;
+
+    if (range === '1d') {
+      dailyLimit = 2;
+      legacyLimit = 50; // In 1-day view, legacy fine-grained precision is active
+      daysToKeep = 1;
+    } else if (range === '7d') {
+      dailyLimit = 9;
+      legacyLimit = 0; // Skip legacy single docs to save reads
+      daysToKeep = 7;
+    } else if (range === '30d') {
+      dailyLimit = 32;
+      legacyLimit = 0; // Skip legacy single docs to save reads
+      daysToKeep = 30;
+    } else if (range === '1y') {
+      dailyLimit = 368;
+      legacyLimit = 0; // Skip legacy single docs to save reads
+      daysToKeep = 365;
     }
-    
-    const documents: any[] = [];
-    querySnapshot.forEach((docSnap) => {
-      const id = docSnap.id;
-      documents.push({ id, ...docSnap.data() });
-    });
-    
-    // Sort daily documents lexicographically by ID (which is YYYY-MM-DD, yielding absolute chronological order)
-    documents.sort((a, b) => a.id.localeCompare(b.id));
-    
-    // Flatten daily points into a single chronological timeline for Recharts area chart
-    const flatTimeline: any[] = [];
-    for (const docData of documents) {
-      if (Array.isArray(docData.points)) {
-        // Enforce fallback fields inside each point just in case
-        const pointsWithFallback = docData.points.map((p: any) => ({
-          bcvEuro: p.bcvEuro || 39.24,
-          bcvUsd: p.bcvUsd || 36.45,
-          binanceUsdt: p.binanceUsdt || 38.05,
-          timestamp: p.timestamp || new Date().toISOString(),
-          vetTime: p.vetTime || "00:00:00"
-        }));
-        flatTimeline.push(...pointsWithFallback);
+
+    // 1. Fetch daily binned documents depending on range
+    const dailyQ = query(
+      ratesRef,
+      where("__name__", ">=", "daily_"),
+      where("__name__", "<", "daily_\uf8ff"),
+      orderBy("__name__", "desc"),
+      limit(dailyLimit)
+    );
+    const dailySnapshot = await getDocs(dailyQ);
+    dailySnapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (Array.isArray(data.readings)) {
+        allReadings.push(...data.readings);
       }
+    });
+
+    // 2. Fetch legacy individual history documents only if needed or as fallback
+    if (legacyLimit > 0 || allReadings.length === 0) {
+      const actualLegacyLimit = legacyLimit > 0 ? legacyLimit : 45;
+      const legacyQ = query(
+        ratesRef,
+        where("__name__", ">=", "history_"),
+        where("__name__", "<", "history_\uf8ff"),
+        orderBy("__name__", "desc"),
+        limit(actualLegacyLimit)
+      );
+      const legacySnapshot = await getDocs(legacyQ);
+      legacySnapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        allReadings.push({
+          bcvEuro: data.bcvEuro,
+          bcvUsd: data.bcvUsd,
+          binanceUsdt: data.binanceUsdt,
+          timestamp: data.timestamp,
+          vetTime: data.vetTime || data.lastUpdated
+        });
+      });
     }
-    
-    // Retain up to the last 250 data points (approx 40 hours of 10-minute history) to ensure lightning-fast chart rendering
-    const historyData = flatTimeline.slice(-250);
-    
-    res.json({ success: true, history: historyData });
+
+    // 3. Filter by timeframe threshold in milliseconds
+    const nowMs = Date.now();
+    const thresholdMs = nowMs - daysToKeep * 24 * 60 * 60 * 1000;
+    let filteredReadings = allReadings.filter((r) => {
+      if (!r.timestamp) return false;
+      const tMs = new Date(r.timestamp).getTime();
+      return tMs >= thresholdMs;
+    });
+
+    // Fallback if no filtered entries were produced (e.g. system clock sync differential)
+    if (filteredReadings.length === 0) {
+      filteredReadings = allReadings;
+    }
+
+    // 4. Sort all readings chronologically (oldest first to newest last) for the UI chart
+    filteredReadings.sort((a, b) => {
+      const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return dateA - dateB;
+    });
+
+    // Helper utility to downsample readings for rendering performance
+    const sampleReadings = (readings: any[], targetSize: number): any[] => {
+      if (readings.length <= targetSize) return readings;
+      const step = Math.ceil(readings.length / targetSize);
+      const sampled = [];
+      for (let i = 0; i < readings.length; i += step) {
+        sampled.push(readings[i]);
+      }
+      const lastItem = readings[readings.length - 1];
+      if (sampled.length > 0 && sampled[sampled.length - 1] !== lastItem) {
+        sampled.push(lastItem);
+      }
+      return sampled;
+    };
+
+    // 5. Downsample data based on selected range for super-smooth UX
+    let targetSize = 150;
+    if (range === '1d') {
+      targetSize = 144; // Up to 144 data points (one every 10 mins)
+    } else if (range === '7d') {
+      targetSize = 180;
+    } else if (range === '30d') {
+      targetSize = 220;
+    } else if (range === '1y') {
+      targetSize = 365; // At most 1 point per day for a perfect year view
+    }
+
+    const finalHistory = sampleReadings(filteredReadings, targetSize);
+
+    res.json({ success: true, history: finalHistory });
   } catch (error: any) {
+    logSystem('error', `Error fetching historical rates combining bins and legacy: ${error?.message || error}`);
     res.status(500).json({ success: false, error: error?.message || error });
   }
 });
@@ -728,14 +700,12 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     logSystem('info', `Server listening on http://0.0.0.0:${PORT}`);
     
-    // Auto run legacy history migration and start seed sequence
-    migrateLegacyHistory().then(() => {
-      logSystem('info', 'Legacy records migration completed or bypassed. Executing startup seed scrape...');
-      return runFullScrape();
-    }).then(() => {
-      logSystem('info', 'Startup seed rate fetch completed successfully!');
+    // Auto run first scrape check on startup to seed/verify the database instantly
+    logSystem('info', 'Executing startup seed scrape to check database connection...');
+    runFullScrape().then(() => {
+      logSystem('info', 'Startup seed completed successfully!');
     }).catch(err => {
-      logSystem('error', `Startup sequence initialization failed: ${err.message}`);
+      logSystem('error', `Startup seed rate fetch failed: ${err.message}`);
     });
   });
 }
