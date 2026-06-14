@@ -1,0 +1,24 @@
+{
+  "name": "Monitor Api",
+  "short_name": "Monitor Api",
+  "description": "Banco Central de Venezuela | Binance P2P USDT Aggregator",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://ik.imagekit.io/mura16/Mura/Logo%20and%20stuff/divisa%20api.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any"
+    },
+    {
+      "src": "https://ik.imagekit.io/mura16/Mura/Logo%20and%20stuff/divisa%20api.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}

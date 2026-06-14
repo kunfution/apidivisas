@@ -298,6 +298,13 @@ export default function App() {
     // Set document title to Monitor Api
     document.title = "Monitor Api";
 
+    // Register Service Worker for PWA installation support
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('[SW] Registered successfully, scope:', reg.scope))
+        .catch((err) => console.error('[SW] Registration failed:', err));
+    }
+
     const handleBeforePrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
