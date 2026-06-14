@@ -1,5 +1,5 @@
 {
-  "name": "BCV Binance Rates Monitor",
+  "name": "Monitor Api",
   "description": "Monitors USD and EUR rates from Banco Central de Venezuela (BCV), and USDT/VES P2P rates from Binance, updating Firestore automatically.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
