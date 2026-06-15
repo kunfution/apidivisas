@@ -345,6 +345,88 @@ export default function App() {
     }
   };
 
+  // Local variable to track last rendered date in the current chart render pass
+  let lastFormattedDateStr = '';
+
+  // Format X-Axis ticks depending on selected timeframe (localizing to VET timezone - UTC-4)
+  const formatXAxisTick = (timestamp: string, index?: number) => {
+    if (index === 0) {
+      lastFormattedDateStr = '';
+    }
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return timestamp;
+
+      const vetOffsetMs = -4 * 60 * 60 * 1000;
+      const vetDate = new Date(date.getTime() + vetOffsetMs);
+
+      const hour = String(vetDate.getUTCHours()).padStart(2, '0');
+      const minute = String(vetDate.getUTCMinutes()).padStart(2, '0');
+      const day = vetDate.getUTCDate();
+      const month = vetDate.getUTCMonth();
+      const dayOfWeek = vetDate.getUTCDay();
+
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+      const dateStr = `${day}-${month}`;
+
+      if (timeframe === '1d') {
+        return `${hour}:${minute}`;
+      } else if (timeframe === '7d') {
+        if (dateStr !== lastFormattedDateStr) {
+          lastFormattedDateStr = dateStr;
+          return `${daysOfWeek[dayOfWeek]} ${hour}:${minute}`;
+        } else {
+          return `${hour}:${minute}`;
+        }
+      } else {
+        // 30d or 1y: Only show the day/month when it changes, otherwise hide to prevent duplicates
+        if (dateStr !== lastFormattedDateStr) {
+          lastFormattedDateStr = dateStr;
+          return `${day} ${months[month]}`;
+        } else {
+          return '';
+        }
+      }
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
+  // Format full date for Tooltip details localized in Spanish VET Format
+  const formatFullTooltip = (timestamp: string) => {
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return timestamp;
+
+      const vetOffsetMs = -4 * 60 * 60 * 1000;
+      const vetDate = new Date(date.getTime() + vetOffsetMs);
+
+      const hour = String(vetDate.getUTCHours()).padStart(2, '0');
+      const minute = String(vetDate.getUTCMinutes()).padStart(2, '0');
+      const second = String(vetDate.getUTCSeconds()).padStart(2, '0');
+      const day = vetDate.getUTCDate();
+      const month = vetDate.getUTCMonth();
+      const year = vetDate.getUTCFullYear();
+      const dayOfWeek = vetDate.getUTCDay();
+
+      const monthsFull = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ];
+      const daysOfWeekFull = [
+        'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+      ];
+
+      return `${daysOfWeekFull[dayOfWeek]}, ${day} de ${monthsFull[month]} de ${year} - ${hour}:${minute}:${second} VET`;
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
   // Check which daily automatic schedule is met (or passed today)
   const getScheduleStatus = (hourTarget: number) => {
     // Current VET hour
@@ -747,10 +829,11 @@ export default function App() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
                     <XAxis 
-                      dataKey="vetTime" 
+                      dataKey="timestamp" 
                       stroke="#4b5563" 
                       fontSize={10}
                       tickLine={false}
+                      tickFormatter={formatXAxisTick}
                     />
                     <YAxis 
                       stroke="#4b5563" 
@@ -761,6 +844,7 @@ export default function App() {
                     />
                     <Tooltip 
                       contentStyle={{ background: '#0a0c10', border: '1px solid #1f2937', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
+                      labelFormatter={formatFullTooltip}
                     />
                     {showUsd && (
                       <Area type="monotone" name="USD BCV" dataKey="bcvUsd" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsd)" />
