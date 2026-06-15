@@ -491,14 +491,14 @@ export default function App() {
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Banco Central de Venezuela</p>
-                <h3 className="text-sm min-[375px]:text-base sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   <span className="hidden sm:inline">
                     {rates?.bcvUsd ? rates.bcvUsd.toFixed(4) : '---'}
                   </span>
                   <span className="inline sm:hidden">
                     {rates?.bcvUsd ? rates.bcvUsd.toFixed(2) : '---'}
                   </span>
-                  <span className="text-slate-500 text-[10px] sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -523,14 +523,14 @@ export default function App() {
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Banco Central de Venezuela</p>
-                <h3 className="text-sm min-[375px]:text-base sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   <span className="hidden sm:inline">
                     {rates?.bcvEuro ? rates.bcvEuro.toFixed(4) : '---'}
                   </span>
                   <span className="inline sm:hidden">
                     {rates?.bcvEuro ? rates.bcvEuro.toFixed(2) : '---'}
                   </span>
-                  <span className="text-slate-500 text-[10px] sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -555,9 +555,9 @@ export default function App() {
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Binance P2P (Sin Top 2)</p>
-                <h3 className="text-sm min-[375px]:text-base sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   {rates?.binanceUsdt ? rates.binanceUsdt.toFixed(2) : '---'}
-                  <span className="text-slate-500 text-[10px] sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -585,8 +585,7 @@ export default function App() {
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
-              
-              {/* BOLIVARES */}
+                        {/* BOLIVARES */}
               <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-cyan-500/30 focus-within:shadow-[0_0_12px_rgba(34,211,238,0.08)]">
                 <span className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block">BOLIVARES</span>
                 <div className="flex items-center justify-between">
@@ -596,10 +595,10 @@ export default function App() {
                     pattern="[0-9.,]*"
                     value={bsVal}
                     onChange={(e) => handleBsChange(e.target.value)}
-                    className="bg-transparent text-cyan-400 text-sm xs:text-base sm:text-2xl md:text-3xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="bg-transparent text-cyan-400 text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
-                  <span className="text-cyan-400 font-bold font-mono text-xs sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">Bs</span>
+                  <span className="text-cyan-400 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">Bs</span>
                 </div>
               </div>
 
@@ -613,10 +612,10 @@ export default function App() {
                     pattern="[0-9.,]*"
                     value={usdVal}
                     onChange={(e) => handleUsdChange(e.target.value)}
-                    className="bg-transparent text-white text-sm xs:text-base sm:text-2xl md:text-3xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="1.00"
                   />
-                  <span className="text-slate-500 font-bold font-mono text-xs sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USD</span>
+                  <span className="text-slate-500 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USD</span>
                 </div>
               </div>
 
@@ -630,10 +629,10 @@ export default function App() {
                     pattern="[0-9.,]*"
                     value={eurVal}
                     onChange={(e) => handleEurChange(e.target.value)}
-                    className="bg-transparent text-white text-sm xs:text-base sm:text-2xl md:text-3xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
-                  <span className="text-slate-500 font-bold font-mono text-xs sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">EUR</span>
+                  <span className="text-slate-500 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">EUR</span>
                 </div>
               </div>
 
@@ -647,10 +646,10 @@ export default function App() {
                     pattern="[0-9.,]*"
                     value={usdtVal}
                     onChange={(e) => handleUsdtChange(e.target.value)}
-                    className="bg-transparent text-white text-sm xs:text-base sm:text-2xl md:text-3xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
-                  <span className="text-[#0ea5e9] font-bold font-mono text-xs sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USDT</span>
+                  <span className="text-[#0ea5e9] font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USDT</span>
                 </div>
               </div>
 
