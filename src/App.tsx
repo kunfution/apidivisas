@@ -71,6 +71,7 @@ export default function App() {
   const [isLogsExpanded, setIsLogsExpanded] = useState<boolean>(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showAndroidInstallHelp, setShowAndroidInstallHelp] = useState<boolean>(false);
+  const [activeHistoryPoint, setActiveHistoryPoint] = useState<any>(null);
 
   // 1. Fetch current rates from node backend
   const fetchCurrentRates = async () => {
@@ -809,10 +810,64 @@ export default function App() {
               </div>
             </div>
 
+            {/* Panel de métricas e información estática interactiva */}
+            {history.length > 0 && (
+              <div className="bg-[#07090c] border border-slate-800/60 rounded-xl p-3 sm:p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="col-span-2 md:col-span-1 border-b md:border-b-0 md:border-r border-slate-800/60 pb-2 md:pb-0 md:pr-4 flex flex-col justify-center">
+                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block mb-0.5 animate-pulse">
+                    {activeHistoryPoint ? '● Punto Seleccionado' : '● Último Registro'}
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-[#0ea5e9] font-medium block truncate font-mono">
+                    {activeHistoryPoint 
+                      ? formatFullTooltip(activeHistoryPoint.timestamp).replace(' de 2026', '').replace(' de ', ' ')
+                      : history[history.length - 1]?.timestamp 
+                        ? formatFullTooltip(history[history.length - 1].timestamp).replace(' de 2026', '').replace(' de ', ' ')
+                        : '---'}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2.5 pl-0 md:pl-4">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.4)]"></div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">USD BCV</span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-white block truncate">
+                      {((activeHistoryPoint || history[history.length - 1])?.bcvUsd)?.toFixed(4) || '---'}{' '}
+                      <span className="text-[10px] text-slate-500 font-normal">VES</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 pl-0 md:pl-4 border-l border-slate-800/40">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 shadow-[0_0_8px_rgba(59,130,246,0.4)]"></div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">EUR BCV</span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-white block truncate">
+                      {((activeHistoryPoint || history[history.length - 1])?.bcvEuro)?.toFixed(4) || '---'}{' '}
+                      <span className="text-[10px] text-slate-500 font-normal">VES</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2.5 pl-2 md:pl-4 border-l border-slate-800/40">
+                  <div className="w-2 h-2 rounded-full bg-amber-500 shrink-0 shadow-[0_0_8px_rgba(245,158,11,0.4)]"></div>
+                  <div className="min-w-0">
+                    <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">USDT BINANCE</span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-white block truncate">
+                      {((activeHistoryPoint || history[history.length - 1])?.binanceUsdt)?.toFixed(2) || '---'}{' '}
+                      <span className="text-[10px] text-slate-500 font-normal">VES</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="h-64 sm:h-80 w-full pt-4">
               {history.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={history} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart 
+                    data={history} 
+                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                  >
                     <defs>
                       <linearGradient id="colorUsd" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
@@ -843,8 +898,16 @@ export default function App() {
                       domain={['auto', 'auto']}
                     />
                     <Tooltip 
-                      contentStyle={{ background: '#0a0c10', border: '1px solid #1f2937', borderRadius: '12px', color: '#fff', fontSize: '11px' }}
-                      labelFormatter={formatFullTooltip}
+                      content={({ active, payload }: any) => {
+                        useEffect(() => {
+                          if (active && payload && payload.length > 0) {
+                            setActiveHistoryPoint(payload[0].payload);
+                          } else {
+                            setActiveHistoryPoint(null);
+                          }
+                        }, [active, payload]);
+                        return null;
+                      }}
                     />
                     {showUsd && (
                       <Area type="monotone" name="USD BCV" dataKey="bcvUsd" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsd)" />
