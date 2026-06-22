@@ -41,6 +41,23 @@ interface ServerStatus {
   lastScheduledTrigger: string;
 }
 
+interface CustomChartTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  setActiveHistoryPoint: (point: any) => void;
+}
+
+const CustomChartTooltip = ({ active, payload, setActiveHistoryPoint }: CustomChartTooltipProps) => {
+  useEffect(() => {
+    if (active && payload && payload.length > 0) {
+      setActiveHistoryPoint(payload[0].payload);
+    } else {
+      setActiveHistoryPoint(null);
+    }
+  }, [active, payload, setActiveHistoryPoint]);
+  return null;
+};
+
 export default function App() {
   // States
   const [rates, setRates] = useState<RateData | null>(null);
@@ -425,6 +442,41 @@ export default function App() {
       return `${daysOfWeekFull[dayOfWeek]}, ${day} de ${monthsFull[month]} de ${year} - ${hour}:${minute}:${second} VET`;
     } catch (e) {
       return timestamp;
+    }
+  };
+
+  // Format datetime into specific parts (date and time separately for better mobile responsiveness)
+  const formatDateTimeParts = (timestamp: string) => {
+    if (!timestamp) return { dateStr: '---', timeStr: '---' };
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return { dateStr: timestamp, timeStr: '---' };
+
+      const vetOffsetMs = -4 * 60 * 60 * 1000;
+      const vetDate = new Date(date.getTime() + vetOffsetMs);
+
+      const hour = String(vetDate.getUTCHours()).padStart(2, '0');
+      const minute = String(vetDate.getUTCMinutes()).padStart(2, '0');
+      const second = String(vetDate.getUTCSeconds()).padStart(2, '0');
+      const day = vetDate.getUTCDate();
+      const month = vetDate.getUTCMonth();
+      const year = vetDate.getUTCFullYear();
+      const dayOfWeek = vetDate.getUTCDay();
+
+      const monthsFull = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ];
+      const daysOfWeekFull = [
+        'Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'
+      ];
+
+      return {
+        dateStr: `${daysOfWeekFull[dayOfWeek]}, ${day} de ${monthsFull[month]} ${year}`,
+        timeStr: `${hour}:${minute}:${second} VET`
+      };
+    } catch (e) {
+      return { dateStr: timestamp, timeStr: '---' };
     }
   };
 
@@ -813,17 +865,24 @@ export default function App() {
             {/* Panel de métricas e información estática interactiva */}
             {history.length > 0 && (
               <div className="bg-[#07090c] border border-slate-800/60 rounded-xl p-3 sm:p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="col-span-2 md:col-span-1 border-b md:border-b-0 md:border-r border-slate-800/60 pb-2 md:pb-0 md:pr-4 flex flex-col justify-center">
+                <div className="col-span-2 md:col-span-1 border-b md:border-b-0 md:border-r border-slate-800/60 pb-2 md:pb-0 md:pr-4 flex flex-col justify-center min-w-0">
                   <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block mb-0.5 animate-pulse">
                     {activeHistoryPoint ? '● Punto Seleccionado' : '● Último Registro'}
                   </span>
-                  <span className="text-[11px] sm:text-xs text-[#0ea5e9] font-medium block truncate font-mono">
-                    {activeHistoryPoint 
-                      ? formatFullTooltip(activeHistoryPoint.timestamp).replace(' de 2026', '').replace(' de ', ' ')
-                      : history[history.length - 1]?.timestamp 
-                        ? formatFullTooltip(history[history.length - 1].timestamp).replace(' de 2026', '').replace(' de ', ' ')
-                        : '---'}
-                  </span>
+                  {(() => {
+                    const ts = activeHistoryPoint?.timestamp || history[history.length - 1]?.timestamp;
+                    const parts = formatDateTimeParts(ts);
+                    return (
+                      <div className="min-w-0 shrink-0">
+                        <span className="text-[11.5px] sm:text-xs text-[#0ea5e9] font-semibold block leading-tight font-sans truncate">
+                          {parts.dateStr}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block font-mono leading-normal mt-0.5">
+                          {parts.timeStr}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
                 
                 <div className="flex items-center gap-2.5 pl-0 md:pl-4">
@@ -897,18 +956,7 @@ export default function App() {
                       axisLine={false} 
                       domain={['auto', 'auto']}
                     />
-                    <Tooltip 
-                      content={({ active, payload }: any) => {
-                        useEffect(() => {
-                          if (active && payload && payload.length > 0) {
-                            setActiveHistoryPoint(payload[0].payload);
-                          } else {
-                            setActiveHistoryPoint(null);
-                          }
-                        }, [active, payload]);
-                        return null;
-                      }}
-                    />
+                    <Tooltip content={<CustomChartTooltip setActiveHistoryPoint={setActiveHistoryPoint} />} />
                     {showUsd && (
                       <Area type="monotone" name="USD BCV" dataKey="bcvUsd" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorUsd)" />
                     )}
