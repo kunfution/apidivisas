@@ -173,21 +173,89 @@ export default function App() {
   };
 
   // --- Currency Converter Logic and Event Handlers ---
-  const parseVal = (str: string): number => {
-    const normalized = str.replace(/,/g, '.');
-    const num = parseFloat(normalized);
-    return isNaN(num) || num < 0 ? 0 : num;
+  const safeEvaluate = (expr: string): number => {
+    // Normalize string: replace commas with dots, remove spaces
+    let sanitized = expr.replace(/,/g, '.').replace(/\s+/g, '');
+    
+    // Clean up trailing operators, e.g. "20+" -> "20", "20+15*" -> "20+15"
+    while (sanitized.length > 0 && ['+', '-', '*'].includes(sanitized[sanitized.length - 1])) {
+      sanitized = sanitized.slice(0, -1);
+    }
+    
+    if (!sanitized) return 0;
+
+    let index = 0;
+    
+    const peek = () => sanitized[index] || '';
+    const consume = () => sanitized[index++];
+    
+    const parseFactor = (): number => {
+      let numStr = '';
+      if (peek() === '-') {
+        numStr += consume();
+      } else if (peek() === '+') {
+        consume();
+      }
+      
+      while (peek() !== '' && /[0-9.]/.test(peek())) {
+        numStr += consume();
+      }
+      
+      const val = parseFloat(numStr);
+      return isNaN(val) ? 0 : val;
+    };
+    
+    const parseTerm = (): number => {
+      let val = parseFactor();
+      while (peek() === '*') {
+        consume();
+        const nextVal = parseFactor();
+        val = val * nextVal;
+      }
+      return val;
+    };
+    
+    const parseExpression = (): number => {
+      let val = parseTerm();
+      while (peek() === '+' || peek() === '-') {
+        const op = consume();
+        const nextVal = parseTerm();
+        if (op === '+') {
+          val = val + nextVal;
+        } else {
+          val = val - nextVal;
+        }
+      }
+      return val;
+    };
+    
+    try {
+      const res = parseExpression();
+      return isNaN(res) || res < 0 ? 0 : res;
+    } catch (e) {
+      return 0;
+    }
   };
 
   const handleBsChange = (valStr: string) => {
-    setBsVal(valStr);
-    if (valStr === '' || isNaN(parseFloat(valStr.replace(/,/g, '.')))) {
+    const sanitizedInput = valStr.replace(/[^0-9.,+\-*\/()\s]/g, '');
+    setBsVal(sanitizedInput);
+
+    if (sanitizedInput === '') {
       setUsdVal('');
       setEurVal('');
       setUsdtVal('');
       return;
     }
-    const bs = parseVal(valStr);
+
+    const bs = safeEvaluate(sanitizedInput);
+    if (bs <= 0) {
+      setUsdVal('');
+      setEurVal('');
+      setUsdtVal('');
+      return;
+    }
+
     const usdRate = rates?.bcvUsd || 1;
     const eurRate = rates?.bcvEuro || 1;
     const usdtRate = rates?.binanceUsdt || 1;
@@ -198,14 +266,24 @@ export default function App() {
   };
 
   const handleUsdChange = (valStr: string) => {
-    setUsdVal(valStr);
-    if (valStr === '' || isNaN(parseFloat(valStr.replace(/,/g, '.')))) {
+    const sanitizedInput = valStr.replace(/[^0-9.,+\-*\/()\s]/g, '');
+    setUsdVal(sanitizedInput);
+
+    if (sanitizedInput === '') {
       setBsVal('');
       setEurVal('');
       setUsdtVal('');
       return;
     }
-    const usd = parseVal(valStr);
+
+    const usd = safeEvaluate(sanitizedInput);
+    if (usd <= 0) {
+      setBsVal('');
+      setEurVal('');
+      setUsdtVal('');
+      return;
+    }
+
     const usdRate = rates?.bcvUsd || 1;
     const eurRate = rates?.bcvEuro || 1;
     const usdtRate = rates?.binanceUsdt || 1;
@@ -217,14 +295,24 @@ export default function App() {
   };
 
   const handleEurChange = (valStr: string) => {
-    setEurVal(valStr);
-    if (valStr === '' || isNaN(parseFloat(valStr.replace(/,/g, '.')))) {
+    const sanitizedInput = valStr.replace(/[^0-9.,+\-*\/()\s]/g, '');
+    setEurVal(sanitizedInput);
+
+    if (sanitizedInput === '') {
       setBsVal('');
       setUsdVal('');
       setUsdtVal('');
       return;
     }
-    const eur = parseVal(valStr);
+
+    const eur = safeEvaluate(sanitizedInput);
+    if (eur <= 0) {
+      setBsVal('');
+      setUsdVal('');
+      setUsdtVal('');
+      return;
+    }
+
     const usdRate = rates?.bcvUsd || 1;
     const eurRate = rates?.bcvEuro || 1;
     const usdtRate = rates?.binanceUsdt || 1;
@@ -236,14 +324,24 @@ export default function App() {
   };
 
   const handleUsdtChange = (valStr: string) => {
-    setUsdtVal(valStr);
-    if (valStr === '' || isNaN(parseFloat(valStr.replace(/,/g, '.')))) {
+    const sanitizedInput = valStr.replace(/[^0-9.,+\-*\/()\s]/g, '');
+    setUsdtVal(sanitizedInput);
+
+    if (sanitizedInput === '') {
       setBsVal('');
       setUsdVal('');
       setEurVal('');
       return;
     }
-    const usdt = parseVal(valStr);
+
+    const usdt = safeEvaluate(sanitizedInput);
+    if (usdt <= 0) {
+      setBsVal('');
+      setUsdVal('');
+      setEurVal('');
+      return;
+    }
+
     const usdRate = rates?.bcvUsd || 1;
     const eurRate = rates?.bcvEuro || 1;
     const usdtRate = rates?.binanceUsdt || 1;
@@ -727,7 +825,7 @@ export default function App() {
                   <input 
                     type="text" 
                     inputMode="decimal"
-                    pattern="[0-9.,]*"
+                    pattern="[0-9.,+\\-*\\s]*"
                     value={bsVal}
                     onChange={(e) => handleBsChange(e.target.value)}
                     className="bg-transparent text-cyan-400 text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
@@ -744,7 +842,7 @@ export default function App() {
                   <input 
                     type="text" 
                     inputMode="decimal"
-                    pattern="[0-9.,]*"
+                    pattern="[0-9.,+\\-*\\s]*"
                     value={usdVal}
                     onChange={(e) => handleUsdChange(e.target.value)}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
@@ -761,7 +859,7 @@ export default function App() {
                   <input 
                     type="text" 
                     inputMode="decimal"
-                    pattern="[0-9.,]*"
+                    pattern="[0-9.,+\\-*\\s]*"
                     value={eurVal}
                     onChange={(e) => handleEurChange(e.target.value)}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
@@ -778,7 +876,7 @@ export default function App() {
                   <input 
                     type="text" 
                     inputMode="decimal"
-                    pattern="[0-9.,]*"
+                    pattern="[0-9.,+\\-*\\s]*"
                     value={usdtVal}
                     onChange={(e) => handleUsdtChange(e.target.value)}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
