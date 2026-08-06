@@ -83,6 +83,7 @@ export default function App() {
   const [usdVal, setUsdVal] = useState<string>('');
   const [eurVal, setEurVal] = useState<string>('');
   const [usdtVal, setUsdtVal] = useState<string>('');
+  const [focusedField, setFocusedField] = useState<'bs' | 'usd' | 'eur' | 'usdt' | null>(null);
   const [isP2pExpanded, setIsP2pExpanded] = useState<boolean>(false);
   const [isSchedulerExpanded, setIsSchedulerExpanded] = useState<boolean>(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState<boolean>(false);
@@ -366,6 +367,19 @@ export default function App() {
       setBsVal('');
       setEurVal('');
       setUsdtVal('');
+    }
+  };
+
+  const handleInsertOperator = (operator: string) => {
+    const target = focusedField || 'bs';
+    if (target === 'bs') {
+      handleBsChange(bsVal + operator);
+    } else if (target === 'usd') {
+      handleUsdChange(usdVal + operator);
+    } else if (target === 'eur') {
+      handleEurChange(eurVal + operator);
+    } else if (target === 'usdt') {
+      handleUsdtChange(usdtVal + operator);
     }
   };
 
@@ -817,6 +831,32 @@ export default function App() {
               </button>
             </div>
 
+            {/* Quick Math Operators Row */}
+            <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800/40 rounded-lg px-2.5 py-1.5 gap-2">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider truncate">
+                {focusedField ? (
+                  <>Operar en: <span className="text-cyan-400 font-mono">{focusedField.toUpperCase()}</span></>
+                ) : (
+                  'Toca un campo para operar'
+                )}
+              </span>
+              <div className="flex items-center gap-1 shrink-0">
+                {['+', '-', '*'].map((op) => (
+                  <button
+                    key={op}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // keeps the input focused
+                      handleInsertOperator(op);
+                    }}
+                    className="w-8 h-7 flex items-center justify-center text-sm font-bold text-slate-300 hover:text-cyan-400 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/30 rounded-md active:scale-95 transition-all duration-155 cursor-pointer"
+                  >
+                    {op}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
                         {/* BOLIVARES */}
               <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-cyan-500/30 focus-within:shadow-[0_0_12px_rgba(34,211,238,0.08)]">
@@ -824,10 +864,11 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <input 
                     type="text" 
-                    inputMode="decimal"
+                    inputMode="text"
                     pattern="[0-9.,+\\-*\\s]*"
                     value={bsVal}
                     onChange={(e) => handleBsChange(e.target.value)}
+                    onFocus={() => setFocusedField('bs')}
                     className="bg-transparent text-cyan-400 text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
@@ -841,10 +882,11 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <input 
                     type="text" 
-                    inputMode="decimal"
+                    inputMode="text"
                     pattern="[0-9.,+\\-*\\s]*"
                     value={usdVal}
                     onChange={(e) => handleUsdChange(e.target.value)}
+                    onFocus={() => setFocusedField('usd')}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="1.00"
                   />
@@ -858,10 +900,11 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <input 
                     type="text" 
-                    inputMode="decimal"
+                    inputMode="text"
                     pattern="[0-9.,+\\-*\\s]*"
                     value={eurVal}
                     onChange={(e) => handleEurChange(e.target.value)}
+                    onFocus={() => setFocusedField('eur')}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
@@ -875,10 +918,11 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <input 
                     type="text" 
-                    inputMode="decimal"
+                    inputMode="text"
                     pattern="[0-9.,+\\-*\\s]*"
                     value={usdtVal}
                     onChange={(e) => handleUsdtChange(e.target.value)}
+                    onFocus={() => setFocusedField('usdt')}
                     className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
                   />
