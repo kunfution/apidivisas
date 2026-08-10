@@ -18,7 +18,11 @@ import {
   Briefcase,
   LayoutGrid,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Link,
+  Copy,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -90,6 +94,8 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showAndroidInstallHelp, setShowAndroidInstallHelp] = useState<boolean>(false);
   const [activeHistoryPoint, setActiveHistoryPoint] = useState<any>(null);
+  const [isApiExpanded, setIsApiExpanded] = useState<boolean>(true);
+  const [copiedApiUrl, setCopiedApiUrl] = useState<boolean>(false);
 
   // 1. Fetch current rates from node backend
   const fetchCurrentRates = async () => {
@@ -381,6 +387,13 @@ export default function App() {
     } else if (target === 'usdt') {
       handleUsdtChange(usdtVal + operator);
     }
+  };
+
+  const handleCopyApiUrl = () => {
+    const url = `${window.location.origin}/api/rates`;
+    navigator.clipboard.writeText(url);
+    setCopiedApiUrl(true);
+    setTimeout(() => setCopiedApiUrl(false), 2000);
   };
 
   // Automatically initialize converter when rates load, but don't override active typing
@@ -1278,6 +1291,100 @@ export default function App() {
                     <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-500" />
                     <span>
                       <strong>Database Note:</strong> Rates are parsed from official Banco Central and Binance endpoint. Structural integrity and target entities are preserved to ensure zero disruption to subordinate consumer apps.
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* PUBLIC RATES API INTEGRATION PANEL */}
+          <div id="api-panel" className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 sm:p-6 transition-all duration-300 shadow-sm">
+            {/* Clickable Header Toggle */}
+            <div 
+              onClick={() => setIsApiExpanded(!isApiExpanded)} 
+              className="flex items-center justify-between gap-2 cursor-pointer select-none group"
+            >
+              <div className="flex items-center gap-2">
+                <Link className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                <div>
+                  <h3 className="font-bold text-white text-sm group-hover:text-cyan-400 transition-colors">API Pública de Tasas</h3>
+                  <p className="text-[10px] text-slate-500">Usa esta app como API en otras aplicaciones</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isApiExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
+                )}
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {isApiExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  className="overflow-hidden mt-4 space-y-4 pt-4 border-t border-slate-800/60"
+                >
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Puedes consultar las tasas actualizadas en tiempo real desde cualquier app externa haciendo una petición <span className="font-mono bg-slate-900 text-cyan-400 px-1 py-0.5 rounded text-[11px] font-bold">GET</span> al siguiente endpoint:
+                  </p>
+
+                  <div className="flex items-center gap-2 bg-[#161b22] border border-slate-800/80 rounded-lg p-2.5 font-mono text-[11px] text-slate-300 overflow-x-auto select-all custom-scrollbar relative group/url">
+                    <span className="truncate pr-16 select-all">
+                      {window.location.origin}/api/rates
+                    </span>
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-[#161b22]/90 pl-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyApiUrl();
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-cyan-400 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/80 rounded transition cursor-pointer flex items-center justify-center"
+                        title="Copiar URL"
+                      >
+                        {copiedApiUrl ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      <a
+                        href="/api/rates"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-1.5 text-slate-400 hover:text-cyan-400 bg-slate-950/60 hover:bg-slate-900 border border-slate-800/80 rounded transition flex items-center justify-center"
+                        title="Probar en nueva pestaña"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold block">Ejemplo de Respuesta JSON</span>
+                    <pre className="bg-[#090d13] border border-slate-900 rounded-lg p-3 text-[10px] font-mono text-slate-400 overflow-x-auto custom-scrollbar leading-relaxed">
+{`{
+  "success": true,
+  "data": {
+    "bcvUsd": ${rates?.bcvUsd ? rates.bcvUsd.toFixed(4) : "36.4500"},
+    "bcvEuro": ${rates?.bcvEuro ? rates.bcvEuro.toFixed(4) : "39.2400"},
+    "binanceUsdt": ${rates?.binanceUsdt ? rates.binanceUsdt.toFixed(2) : "38.05"},
+    "lastUpdated": "${rates?.lastUpdated || "2026-08-10"}"
+  }
+}`}
+                    </pre>
+                  </div>
+
+                  <div className="bg-[#161b22] rounded-xl p-3 border border-slate-800 flex gap-2.5 text-[11px] text-slate-400 leading-relaxed">
+                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.3)]" />
+                    <span>
+                      <strong>Soporte CORS habilitado:</strong> El servidor incluye cabeceras de origen cruzado (CORS), permitiendo solicitudes seguras desde navegadores en cualquier dominio de origen.
                     </span>
                   </div>
                 </motion.div>
