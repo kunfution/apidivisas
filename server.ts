@@ -565,6 +565,8 @@ app.get('/api/status', (req, res) => {
 app.get('/api/history', async (req, res) => {
   try {
     const range = (req.query.range as string) || '30d';
+    const startDateQuery = req.query.startDate as string | undefined;
+    const endDateQuery = req.query.endDate as string | undefined;
     const ratesRef = collection(db, "exchangeRates");
     let allReadings: any[] = [];
 
@@ -573,7 +575,31 @@ app.get('/api/history', async (req, res) => {
     let legacyLimit = 40;
     let daysToKeep = 30;
 
-    if (range === '1d') {
+    let isCustomRange = false;
+    let customStartMs = 0;
+    let customEndMs = Date.now();
+
+    if (startDateQuery || endDateQuery || range === 'custom') {
+      isCustomRange = true;
+      if (startDateQuery) {
+        customStartMs = new Date(`${startDateQuery}T00:00:00-04:00`).getTime();
+      } else {
+        customStartMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      }
+      if (endDateQuery) {
+        customEndMs = new Date(`${endDateQuery}T23:59:59.999-04:00`).getTime();
+      } else {
+        customEndMs = Date.now();
+      }
+
+      if (isNaN(customStartMs)) customStartMs = 0;
+      if (isNaN(customEndMs)) customEndMs = Date.now();
+
+      const diffDays = Math.max(1, Math.ceil(Math.abs(customEndMs - customStartMs) / (24 * 60 * 60 * 1000)));
+      dailyLimit = Math.min(370, diffDays + 5);
+      legacyLimit = diffDays <= 2 ? 50 : 0;
+      daysToKeep = diffDays;
+    } else if (range === '1d') {
       dailyLimit = 2;
       legacyLimit = 50; // In 1-day view, legacy fine-grained precision is active
       daysToKeep = 1;
@@ -630,17 +656,26 @@ app.get('/api/history', async (req, res) => {
       });
     }
 
-    // 3. Filter by timeframe threshold in milliseconds
-    const nowMs = Date.now();
-    const thresholdMs = nowMs - daysToKeep * 24 * 60 * 60 * 1000;
-    let filteredReadings = allReadings.filter((r) => {
-      if (!r.timestamp) return false;
-      const tMs = new Date(r.timestamp).getTime();
-      return tMs >= thresholdMs;
-    });
+    // 3. Filter by timeframe threshold in milliseconds or custom date window
+    let filteredReadings: any[] = [];
+    if (isCustomRange) {
+      filteredReadings = allReadings.filter((r) => {
+        if (!r.timestamp) return false;
+        const tMs = new Date(r.timestamp).getTime();
+        return tMs >= customStartMs && tMs <= customEndMs;
+      });
+    } else {
+      const nowMs = Date.now();
+      const thresholdMs = nowMs - daysToKeep * 24 * 60 * 60 * 1000;
+      filteredReadings = allReadings.filter((r) => {
+        if (!r.timestamp) return false;
+        const tMs = new Date(r.timestamp).getTime();
+        return tMs >= thresholdMs;
+      });
+    }
 
     // Fallback if no filtered entries were produced (e.g. system clock sync differential)
-    if (filteredReadings.length === 0) {
+    if (filteredReadings.length === 0 && allReadings.length > 0) {
       filteredReadings = allReadings;
     }
 
@@ -668,7 +703,9 @@ app.get('/api/history', async (req, res) => {
 
     // 5. Downsample data based on selected range for super-smooth UX
     let targetSize = 150;
-    if (range === '1d') {
+    if (isCustomRange) {
+      targetSize = Math.min(365, Math.max(72, daysToKeep * 12));
+    } else if (range === '1d') {
       targetSize = 144; // Up to 144 data points (one every 10 mins)
     } else if (range === '7d') {
       targetSize = 180;

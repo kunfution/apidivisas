@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
+  TrendingDown,
   RotateCw, 
   Clock, 
   CheckCircle, 
@@ -22,7 +23,11 @@ import {
   Link,
   Copy,
   Check,
-  ExternalLink
+  ExternalLink,
+  Filter,
+  X,
+  Minus,
+  CalendarRange
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -76,8 +81,14 @@ export default function App() {
   const [showEuro, setShowEuro] = useState(true);
   const [showUsdt, setShowUsdt] = useState(true);
   
-  // Historical chart range filter: '1d' | '7d' | '30d' | '1y'
-  const [timeframe, setTimeframe] = useState<'1d' | '7d' | '30d' | '1y'>('30d');
+  // Historical chart range filter: '1d' | '7d' | '30d' | '1y' | 'custom'
+  const [timeframe, setTimeframe] = useState<'1d' | '7d' | '30d' | '1y' | 'custom'>('30d');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
+  const [isCustomRangeApplied, setIsCustomRangeApplied] = useState<boolean>(false);
+  
+  // Selected currency for min, max and trend period analysis: 'usd' | 'eur' | 'usdt'
+  const [selectedMetricCurrency, setSelectedMetricCurrency] = useState<'usd' | 'eur' | 'usdt'>('usd');
   
   // Real-time domestic VET clock state
   const [vetTime, setVetTime] = useState({ date: '--/--/----', time: '00:00:00' });
@@ -110,10 +121,17 @@ export default function App() {
     }
   };
 
-  // 2. Fetch history for charting
-  const fetchHistory = async (range: string = timeframe) => {
+  // 2. Fetch history for charting with optional custom date interval
+  const fetchHistory = async (range: string = timeframe, start?: string, end?: string) => {
     try {
-      const res = await fetch(`/api/history?range=${range}`);
+      let url = `/api/history?range=${range}`;
+      const s = start !== undefined ? start : customStartDate;
+      const e = end !== undefined ? end : customEndDate;
+      if (range === 'custom') {
+        if (s) url += `&startDate=${s}`;
+        if (e) url += `&endDate=${e}`;
+      }
+      const res = await fetch(url);
       const json = await res.json();
       if (json.success && json.history) {
         setHistory(json.history);
@@ -123,10 +141,29 @@ export default function App() {
     }
   };
 
-  // Automatically fetch history when timeframe shifts
+  // Automatically fetch history when timeframe shifts (except custom which is triggered explicitly)
   useEffect(() => {
-    fetchHistory(timeframe);
+    if (timeframe !== 'custom') {
+      fetchHistory(timeframe);
+    }
   }, [timeframe]);
+
+  // Handle applying custom date interval
+  const handleApplyCustomDates = () => {
+    if (!customStartDate && !customEndDate) return;
+    setTimeframe('custom');
+    setIsCustomRangeApplied(true);
+    fetchHistory('custom', customStartDate, customEndDate);
+  };
+
+  // Handle resetting custom filter back to default 30 days
+  const handleResetCustomDates = () => {
+    setCustomStartDate('');
+    setCustomEndDate('');
+    setIsCustomRangeApplied(false);
+    setTimeframe('30d');
+    fetchHistory('30d');
+  };
 
   // 3. Fetch server logs terminal
   const fetchLogs = async () => {
@@ -524,6 +561,22 @@ export default function App() {
         } else {
           return `${hour}:${minute}`;
         }
+      } else if (timeframe === 'custom') {
+        // If custom timeframe spans only 1 or 2 days, show hours
+        if (history.length > 1) {
+          const firstT = new Date(history[0].timestamp).getTime();
+          const lastT = new Date(history[history.length - 1].timestamp).getTime();
+          const diffDays = Math.ceil(Math.abs(lastT - firstT) / (24 * 60 * 60 * 1000));
+          if (diffDays <= 2) {
+            return `${hour}:${minute}`;
+          }
+        }
+        if (dateStr !== lastFormattedDateStr) {
+          lastFormattedDateStr = dateStr;
+          return `${day} ${months[month]}`;
+        } else {
+          return '';
+        }
       } else {
         // 30d or 1y: Only show the day/month when it changes, otherwise hide to prevent duplicates
         if (dateStr !== lastFormattedDateStr) {
@@ -604,6 +657,93 @@ export default function App() {
       return { dateStr: timestamp, timeStr: '---' };
     }
   };
+
+  // Format short datetime for stat summary cards
+  const formatShortDateTime = (timestamp: string) => {
+    if (!timestamp) return '---';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return timestamp;
+      const vetOffsetMs = -4 * 60 * 60 * 1000;
+      const vetDate = new Date(date.getTime() + vetOffsetMs);
+      const hour = String(vetDate.getUTCHours()).padStart(2, '0');
+      const minute = String(vetDate.getUTCMinutes()).padStart(2, '0');
+      const day = vetDate.getUTCDate();
+      const month = vetDate.getUTCMonth();
+      const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+      return `${day} ${months[month]}, ${hour}:${minute} VET`;
+    } catch (e) {
+      return timestamp;
+    }
+  };
+
+  // Calculation of highest point, lowest point, and trend for selected currency in current active period
+  const currencyStats = React.useMemo(() => {
+    if (!history || history.length === 0) return null;
+
+    const keyMap = {
+      usd: 'bcvUsd',
+      eur: 'bcvEuro',
+      usdt: 'binanceUsdt'
+    } as const;
+
+    const key = keyMap[selectedMetricCurrency];
+    const decimals = selectedMetricCurrency === 'usdt' ? 2 : 4;
+    const label = selectedMetricCurrency === 'usd' ? 'USD BCV' : selectedMetricCurrency === 'eur' ? 'EUR BCV' : 'USDT Binance';
+
+    const valid = history.filter(item => typeof item[key] === 'number' && !isNaN(item[key]) && item[key] > 0);
+    if (valid.length === 0) return null;
+
+    let maxItem = valid[0];
+    let minItem = valid[0];
+    let sum = 0;
+
+    for (const item of valid) {
+      const val = item[key];
+      sum += val;
+      if (val > maxItem[key]) maxItem = item;
+      if (val < minItem[key]) minItem = item;
+    }
+
+    const average = sum / valid.length;
+    const firstItem = valid[0];
+    const lastItem = valid[valid.length - 1];
+    const firstVal = firstItem[key];
+    const lastVal = lastItem[key];
+    const changeVal = lastVal - firstVal;
+    const changePct = firstVal > 0 ? (changeVal / firstVal) * 100 : 0;
+
+    let trendDirection: 'up' | 'down' | 'neutral' = 'neutral';
+    if (changeVal > 0.0001) trendDirection = 'up';
+    else if (changeVal < -0.0001) trendDirection = 'down';
+
+    return {
+      label,
+      key,
+      decimals,
+      highest: {
+        value: maxItem[key],
+        timestamp: maxItem.timestamp,
+        dateFormatted: formatDateTimeParts(maxItem.timestamp),
+        shortFormatted: formatShortDateTime(maxItem.timestamp)
+      },
+      lowest: {
+        value: minItem[key],
+        timestamp: minItem.timestamp,
+        dateFormatted: formatDateTimeParts(minItem.timestamp),
+        shortFormatted: formatShortDateTime(minItem.timestamp)
+      },
+      trend: {
+        initialVal: firstVal,
+        latestVal: lastVal,
+        changeVal,
+        changePct,
+        direction: trendDirection
+      },
+      average,
+      totalPoints: valid.length
+    };
+  }, [history, selectedMetricCurrency]);
 
   // Check which daily automatic schedule is met (or passed today)
   const getScheduleStatus = (hourTarget: number) => {
@@ -960,9 +1100,14 @@ export default function App() {
                   {(['1d', '7d', '30d', '1y'] as const).map((t) => (
                     <button
                       key={t}
-                      onClick={() => setTimeframe(t)}
+                      onClick={() => {
+                        setTimeframe(t);
+                        setIsCustomRangeApplied(false);
+                        setCustomStartDate('');
+                        setCustomEndDate('');
+                      }}
                       className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all duration-200 cursor-pointer select-none ${
-                        timeframe === t
+                        timeframe === t && !isCustomRangeApplied
                           ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.12)]'
                           : 'text-slate-400 hover:text-slate-200 border border-transparent'
                       }`}
@@ -970,6 +1115,11 @@ export default function App() {
                       {t === '1d' ? '1 Día' : t === '7d' ? '7 Días' : t === '30d' ? '1 Mes' : '1 Año'}
                     </button>
                   ))}
+                  {isCustomRangeApplied && (
+                    <span className="px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 select-none">
+                      Lapso Personalizado
+                    </span>
+                  )}
                 </div>
 
                 <div className="hidden sm:block w-px h-6 bg-slate-800"></div>
@@ -1017,7 +1167,263 @@ export default function App() {
               </div>
             </div>
 
-            {/* Panel de métricas e información estática interactiva */}
+            {/* FILTRO POR RANGO DE FECHAS (Día Inicial y Día Final) */}
+            <div className="bg-[#07090c] border border-slate-800/80 rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shrink-0">
+                  <CalendarRange className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">Filtrar por Rango de Fechas</span>
+                  <span className="text-[10px] text-slate-500">
+                    {isCustomRangeApplied 
+                      ? `Lapso aplicado: ${customStartDate || 'Inicio'} → ${customEndDate || 'Hoy'} (${history.length} lecturas)`
+                      : 'Selecciona día inicial y final para visualizar ese intervalo en la gráfica'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-[#0d1117] border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">Desde:</span>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    max={customEndDate || undefined}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-[#0d1117] border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+                  <span className="text-[10px] text-slate-500 uppercase font-semibold">Hasta:</span>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    min={customStartDate || undefined}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer [color-scheme:dark]"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyCustomDates}
+                  disabled={!customStartDate && !customEndDate}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition duration-200 cursor-pointer ${
+                    customStartDate || customEndDate
+                      ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                      : 'bg-slate-900/40 text-slate-600 border-slate-800 cursor-not-allowed'
+                  }`}
+                >
+                  <Filter className="w-3.5 h-3.5" />
+                  Filtrar Lapso
+                </button>
+
+                {isCustomRangeApplied && (
+                  <button
+                    type="button"
+                    onClick={handleResetCustomDates}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800 border border-slate-800 transition cursor-pointer"
+                    title="Restablecer filtro a 30 días"
+                  >
+                    <X className="w-3.5 h-3.5 text-rose-400" />
+                    <span className="hidden sm:inline">Restablecer</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* BOTÓN DE SELECCIÓN DE DIVISA & PANEL DE MÁXIMOS, MÍNIMOS Y TENDENCIA */}
+            <div className="bg-[#07090c] border border-slate-800/80 rounded-xl p-3 sm:p-4 space-y-3">
+              {/* Header con Botón de Selección entre USD, EUR, USDT */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/60 pb-3">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-cyan-400" />
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-white">Análisis de Divisa en el Lapso Actual</h4>
+                    <p className="text-[10px] text-slate-500">
+                      Punto más alto, más bajo y tendencia en el intervalo seleccionado
+                    </p>
+                  </div>
+                </div>
+
+                {/* Botón de selección entre USD, EUR, USDT */}
+                <div className="flex items-center gap-1 p-1 bg-[#0d1117] border border-slate-800 rounded-lg self-start sm:self-auto">
+                  <span className="text-[10px] text-slate-500 uppercase font-bold px-1.5 hidden sm:inline">Divisa:</span>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMetricCurrency('usd');
+                      if (!showUsd) setShowUsd(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      selectedMetricCurrency === 'usd'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    USD
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMetricCurrency('eur');
+                      if (!showEuro) setShowEuro(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      selectedMetricCurrency === 'eur'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.2)]'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                    EUR
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMetricCurrency('usdt');
+                      if (!showUsdt) setShowUsdt(true);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-200 cursor-pointer ${
+                      selectedMetricCurrency === 'usdt'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                    USDT
+                  </button>
+                </div>
+              </div>
+
+              {/* Tarjetas informativas de la divisa seleccionada */}
+              {currencyStats ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                  {/* 1. Punto Más Alto */}
+                  <div className="bg-[#0d1117] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between hover:border-emerald-500/30 transition duration-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                        <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+                        Punto Más Alto
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Máximo
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <div className="text-lg sm:text-xl font-mono font-bold text-white flex items-baseline gap-1">
+                        <span>{currencyStats.highest.value.toFixed(currencyStats.decimals)}</span>
+                        <span className="text-[11px] font-normal text-slate-400">VES</span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-1">
+                      {currencyStats.highest.shortFormatted}
+                    </div>
+                  </div>
+
+                  {/* 2. Punto Más Bajo */}
+                  <div className="bg-[#0d1117] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between hover:border-rose-500/30 transition duration-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                        <ArrowDownRight className="w-3.5 h-3.5 text-rose-400" />
+                        Punto Más Bajo
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                        Mínimo
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <div className="text-lg sm:text-xl font-mono font-bold text-white flex items-baseline gap-1">
+                        <span>{currencyStats.lowest.value.toFixed(currencyStats.decimals)}</span>
+                        <span className="text-[11px] font-normal text-slate-400">VES</span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-1">
+                      {currencyStats.lowest.shortFormatted}
+                    </div>
+                  </div>
+
+                  {/* 3. Tendencia en el Lapso */}
+                  <div className="bg-[#0d1117] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between hover:border-cyan-500/30 transition duration-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                        {currencyStats.trend.direction === 'up' ? (
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : currencyStats.trend.direction === 'down' ? (
+                          <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+                        ) : (
+                          <Minus className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                        Tendencia en Lapso
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${
+                        currencyStats.trend.direction === 'up'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                          : currencyStats.trend.direction === 'down'
+                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}>
+                        {currencyStats.trend.direction === 'up' ? 'Alza' : currencyStats.trend.direction === 'down' ? 'Baja' : 'Estable'}
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <div className={`text-lg sm:text-xl font-mono font-bold flex items-baseline gap-1 ${
+                        currencyStats.trend.direction === 'up'
+                          ? 'text-emerald-400'
+                          : currencyStats.trend.direction === 'down'
+                          ? 'text-rose-400'
+                          : 'text-slate-300'
+                      }`}>
+                        <span>
+                          {currencyStats.trend.changePct > 0 ? '+' : ''}
+                          {currencyStats.trend.changePct.toFixed(2)}%
+                        </span>
+                        <span className="text-[11px] font-normal text-slate-400 font-mono">
+                          ({currencyStats.trend.changeVal > 0 ? '+' : ''}{currencyStats.trend.changeVal.toFixed(currencyStats.decimals)} VES)
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-1">
+                      Inicio: {currencyStats.trend.initialVal.toFixed(currencyStats.decimals)} → Fin: {currencyStats.trend.latestVal.toFixed(currencyStats.decimals)}
+                    </div>
+                  </div>
+
+                  {/* 4. Promedio y Amplitud */}
+                  <div className="bg-[#0d1117] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between hover:border-slate-700 transition duration-200">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                        <Database className="w-3.5 h-3.5 text-cyan-400" />
+                        Promedio del Lapso
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                        {currencyStats.totalPoints} lecturas
+                      </span>
+                    </div>
+                    <div className="my-1">
+                      <div className="text-lg sm:text-xl font-mono font-bold text-white flex items-baseline gap-1">
+                        <span>{currencyStats.average.toFixed(currencyStats.decimals)}</span>
+                        <span className="text-[11px] font-normal text-slate-400">VES</span>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-1">
+                      Amplitud (Máx - Mín): {(currencyStats.highest.value - currencyStats.lowest.value).toFixed(currencyStats.decimals)} VES
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-slate-500 py-2 text-center font-mono">
+                  No hay lecturas registradas en este intervalo de fechas.
+                </div>
+              )}
+            </div>
+
+            {/* Panel de métricas e información interactiva al pasar el cursor */}
             {history.length > 0 && (
               <div className="bg-[#07090c] border border-slate-800/60 rounded-xl p-3 sm:p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="col-span-2 md:col-span-1 border-b md:border-b-0 md:border-r border-slate-800/60 pb-2 md:pb-0 md:pr-4 flex flex-col justify-center min-w-0">
