@@ -27,7 +27,8 @@ import {
   Filter,
   X,
   Minus,
-  CalendarRange
+  CalendarRange,
+  Keyboard
 } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
@@ -99,6 +100,7 @@ export default function App() {
   const [eurVal, setEurVal] = useState<string>('');
   const [usdtVal, setUsdtVal] = useState<string>('');
   const [focusedField, setFocusedField] = useState<'bs' | 'usd' | 'eur' | 'usdt' | null>(null);
+  const [keypadMode, setKeypadMode] = useState<'decimal' | 'text'>('decimal');
   const [isP2pExpanded, setIsP2pExpanded] = useState<boolean>(false);
   const [isSchedulerExpanded, setIsSchedulerExpanded] = useState<boolean>(false);
   const [isLogsExpanded, setIsLogsExpanded] = useState<boolean>(false);
@@ -414,7 +416,7 @@ export default function App() {
   };
 
   const handleInsertOperator = (operator: string) => {
-    const target = focusedField || 'bs';
+    const target = focusedField || 'usd';
     if (target === 'bs') {
       handleBsChange(bsVal + operator);
     } else if (target === 'usd') {
@@ -423,6 +425,19 @@ export default function App() {
       handleEurChange(eurVal + operator);
     } else if (target === 'usdt') {
       handleUsdtChange(usdtVal + operator);
+    }
+  };
+
+  const handleClearFocused = () => {
+    const target = focusedField || 'usd';
+    if (target === 'bs') {
+      handleBsChange('');
+    } else if (target === 'usd') {
+      handleUsdChange('');
+    } else if (target === 'eur') {
+      handleEurChange('');
+    } else if (target === 'usdt') {
+      handleUsdtChange('');
     }
   };
 
@@ -883,22 +898,22 @@ export default function App() {
             >
               <div className="absolute top-0 left-0 w-full h-0.5 sm:h-1 bg-emerald-500 shadow-[0_1px_5px_rgba(16,185,129,0.5)]"></div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-slate-400">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
+                <span translate="no" className="notranslate text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
                   <span className="hidden sm:inline">Tasa Oficial Dólar</span>
                   <span className="inline sm:hidden">Dólar BCV</span>
                 </span>
-                <span className="self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-emerald-400 bg-emerald-500/10 uppercase">USD</span>
+                <span translate="no" className="notranslate self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-emerald-400 bg-emerald-500/10 uppercase select-none">USD</span>
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Banco Central de Venezuela</p>
-                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 translate="no" className="notranslate text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   <span className="hidden sm:inline">
                     {rates?.bcvUsd ? rates.bcvUsd.toFixed(4) : '---'}
                   </span>
                   <span className="inline sm:hidden">
                     {rates?.bcvUsd ? rates.bcvUsd.toFixed(2) : '---'}
                   </span>
-                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span translate="no" className="notranslate text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -915,22 +930,22 @@ export default function App() {
             >
               <div className="absolute top-0 left-0 w-full h-0.5 sm:h-1 bg-blue-500 shadow-[0_1px_5px_rgba(59,130,246,0.5)]"></div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-slate-400">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
+                <span translate="no" className="notranslate text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
                   <span className="hidden sm:inline">Tasa Oficial Euro</span>
                   <span className="inline sm:hidden">Euro BCV</span>
                 </span>
-                <span className="self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-blue-400 bg-blue-500/10 uppercase">EUR</span>
+                <span translate="no" className="notranslate self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-blue-400 bg-blue-500/10 uppercase select-none">EUR</span>
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Banco Central de Venezuela</p>
-                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 translate="no" className="notranslate text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   <span className="hidden sm:inline">
                     {rates?.bcvEuro ? rates.bcvEuro.toFixed(4) : '---'}
                   </span>
                   <span className="inline sm:hidden">
                     {rates?.bcvEuro ? rates.bcvEuro.toFixed(2) : '---'}
                   </span>
-                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span translate="no" className="notranslate text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -947,17 +962,17 @@ export default function App() {
             >
               <div className="absolute top-0 left-0 w-full h-0.5 sm:h-1 bg-amber-500 shadow-[0_1px_5px_rgba(245,158,11,0.5)]"></div>
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 text-slate-400">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
+                <span translate="no" className="notranslate text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-normal sm:tracking-[0.2em] font-bold truncate">
                   <span className="hidden sm:inline">Promedio P2P</span>
                   <span className="inline sm:hidden">USDT P2P</span>
                 </span>
-                <span className="self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-amber-400 bg-amber-500/10 uppercase">USDT</span>
+                <span translate="no" className="notranslate self-start sm:self-auto p-0.5 sm:p-1 px-1.5 sm:px-2.5 rounded text-[8px] sm:text-[10px] font-bold text-amber-400 bg-amber-500/10 uppercase select-none">USDT</span>
               </div>
               <div className="space-y-0.5 sm:space-y-1">
                 <p className="text-slate-500 text-xs hidden sm:block">Binance P2P (Sin Top 2)</p>
-                <h3 className="text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
+                <h3 translate="no" className="notranslate text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold text-white tracking-tighter flex items-baseline">
                   {rates?.binanceUsdt ? rates.binanceUsdt.toFixed(2) : '---'}
-                  <span className="text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
+                  <span translate="no" className="notranslate text-slate-500 text-xs sm:text-lg font-normal ml-1 sm:ml-2">VES</span>
                 </h3>
               </div>
               <div className="hidden sm:flex pt-2 border-t border-slate-800/80 items-center justify-between text-[11px] text-slate-500">
@@ -969,117 +984,185 @@ export default function App() {
           </div>
 
           {/* Interactive Multi-currency Converter Widget */}
-          <div id="converter-panel" className="bg-[#0d1117] border border-slate-800 rounded-xl p-4 sm:p-6 space-y-4 sm:space-y-5 shadow-sm">
+          <div id="converter-panel" translate="no" className="notranslate bg-[#0d1117] border border-slate-800 rounded-xl p-3.5 sm:p-6 space-y-3.5 sm:space-y-5 shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
               <div className="flex items-center gap-2">
                 <LayoutGrid className="w-4 h-4 text-cyan-400 animate-pulse" />
-                <h3 className="font-bold text-white text-xs sm:text-sm tracking-wider uppercase">CONVERTER</h3>
+                <h3 translate="no" className="notranslate font-bold text-white text-xs sm:text-sm tracking-wider uppercase">CONVERTIDOR DE TASAS</h3>
               </div>
               <button 
                 onClick={handleReset}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 bg-slate-900/45 rounded-lg uppercase cursor-pointer select-none transition duration-155"
+                translate="no"
+                className="notranslate flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold text-slate-400 hover:text-white border border-slate-800 hover:border-slate-700 bg-slate-900/45 rounded-lg uppercase cursor-pointer select-none transition duration-155"
               >
                 <RotateCw className="w-3 h-3 text-slate-450" />
-                RESET
+                REINICIAR
               </button>
             </div>
 
-            {/* Quick Math Operators Row */}
-            <div className="flex items-center justify-between bg-slate-950/60 border border-slate-800/40 rounded-lg px-2.5 py-1.5 gap-2">
-              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider truncate">
+            {/* Quick Math Operators and Keyboard Mode Row */}
+            <div className="flex flex-wrap items-center justify-between bg-slate-950/60 border border-slate-800/40 rounded-lg px-2.5 py-1.5 gap-2">
+              <span translate="no" className="notranslate text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
                 {focusedField ? (
-                  <>Operar en: <span className="text-cyan-400 font-mono">{focusedField.toUpperCase()}</span></>
+                  <>Operar en: <span className="text-cyan-400 font-mono font-bold">{focusedField.toUpperCase()}</span></>
                 ) : (
-                  'Toca un campo para operar'
+                  'Toca un campo para calcular'
                 )}
               </span>
               <div className="flex items-center gap-1 shrink-0">
-                {['+', '-', '*'].map((op) => (
+                {['+', '-', '*', '/'].map((op) => (
                   <button
                     key={op}
                     type="button"
+                    translate="no"
                     onMouseDown={(e) => {
-                      e.preventDefault(); // keeps the input focused
+                      e.preventDefault(); // keeps input focused
                       handleInsertOperator(op);
                     }}
-                    className="w-8 h-7 flex items-center justify-center text-sm font-bold text-slate-300 hover:text-cyan-400 bg-slate-900/90 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/30 rounded-md active:scale-95 transition-all duration-155 cursor-pointer"
+                    className="notranslate w-7 sm:w-8 h-7 flex items-center justify-center text-sm font-bold text-slate-200 hover:text-cyan-400 bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/30 rounded-md active:scale-95 transition-all duration-150 cursor-pointer select-none"
                   >
                     {op}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  translate="no"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleClearFocused();
+                  }}
+                  title="Limpiar campo activo"
+                  className="notranslate px-2 h-7 flex items-center justify-center text-xs font-bold text-rose-400 hover:text-rose-300 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-900/40 hover:border-rose-700/50 rounded-md active:scale-95 transition-all cursor-pointer select-none"
+                >
+                  C
+                </button>
+                <button
+                  type="button"
+                  translate="no"
+                  onClick={() => setKeypadMode(prev => prev === 'decimal' ? 'text' : 'decimal')}
+                  title={keypadMode === 'decimal' ? 'Teclado: Numérico (123). Toca para cambiar a Alfanumérico' : 'Teclado: Alfanumérico (ABC). Toca para cambiar a Numérico'}
+                  className={`notranslate px-2 h-7 flex items-center gap-1 text-[10px] font-bold rounded-md border transition-all cursor-pointer select-none ${
+                    keypadMode === 'decimal'
+                      ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'
+                      : 'bg-slate-900/80 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <Keyboard className="w-3 h-3" />
+                  <span>{keypadMode === 'decimal' ? '123' : 'ABC'}</span>
+                </button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                        {/* BOLIVARES */}
-              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-cyan-500/30 focus-within:shadow-[0_0_12px_rgba(34,211,238,0.08)]">
-                <span className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block">BOLIVARES</span>
-                <div className="flex items-center justify-between">
+              {/* BOLIVARES */}
+              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[72px] sm:min-h-[88px] transition-all duration-200 focus-within:border-cyan-500/40 focus-within:shadow-[0_0_12px_rgba(34,211,238,0.08)]">
+                <span translate="no" className="notranslate text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block truncate select-none">
+                  BOLÍVARES (VES)
+                </span>
+                <div className="flex items-center justify-between min-w-0 w-full gap-1 overflow-hidden">
                   <input 
+                    translate="no"
                     type="text" 
-                    inputMode="text"
-                    pattern="[0-9.,+\\-*\\s]*"
+                    inputMode={keypadMode}
+                    pattern="[0-9.,+\\-*\\/\\s]*"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={bsVal}
                     onChange={(e) => handleBsChange(e.target.value)}
                     onFocus={() => setFocusedField('bs')}
-                    className="bg-transparent text-cyan-400 text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="notranslate bg-transparent text-cyan-400 text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl font-mono font-bold flex-1 min-w-0 w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
+                    aria-label="Monto en Bolívares"
                   />
-                  <span className="text-cyan-400 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">Bs</span>
+                  <span translate="no" className="notranslate text-cyan-400 font-bold font-mono text-xs sm:text-sm px-1.5 py-0.5 rounded bg-cyan-950/40 border border-cyan-800/40 shrink-0 select-none pointer-events-none">
+                    Bs
+                  </span>
                 </div>
               </div>
 
               {/* USD */}
-              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-slate-700">
-                <span className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block">USD (BCV RATE)</span>
-                <div className="flex items-center justify-between">
+              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[72px] sm:min-h-[88px] transition-all duration-200 focus-within:border-emerald-500/40 focus-within:shadow-[0_0_12px_rgba(16,185,129,0.08)]">
+                <span translate="no" className="notranslate text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block truncate select-none">
+                  USD (TASA BCV)
+                </span>
+                <div className="flex items-center justify-between min-w-0 w-full gap-1 overflow-hidden">
                   <input 
+                    translate="no"
                     type="text" 
-                    inputMode="text"
-                    pattern="[0-9.,+\\-*\\s]*"
+                    inputMode={keypadMode}
+                    pattern="[0-9.,+\\-*\\/\\s]*"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={usdVal}
                     onChange={(e) => handleUsdChange(e.target.value)}
                     onFocus={() => setFocusedField('usd')}
-                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="notranslate bg-transparent text-white text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl font-mono font-bold flex-1 min-w-0 w-full focus:outline-none placeholder-slate-800"
                     placeholder="1.00"
+                    aria-label="Monto en Dólar BCV"
                   />
-                  <span className="text-slate-500 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USD</span>
+                  <span translate="no" className="notranslate text-emerald-400 font-bold font-mono text-xs sm:text-sm px-1.5 py-0.5 rounded bg-emerald-950/40 border border-emerald-800/40 shrink-0 select-none pointer-events-none">
+                    USD
+                  </span>
                 </div>
               </div>
 
               {/* EUR */}
-              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-slate-700">
-                <span className="text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block">EUR (BCV RATE)</span>
-                <div className="flex items-center justify-between">
+              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[72px] sm:min-h-[88px] transition-all duration-200 focus-within:border-blue-500/40 focus-within:shadow-[0_0_12px_rgba(59,130,246,0.08)]">
+                <span translate="no" className="notranslate text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block truncate select-none">
+                  EUR (TASA BCV)
+                </span>
+                <div className="flex items-center justify-between min-w-0 w-full gap-1 overflow-hidden">
                   <input 
+                    translate="no"
                     type="text" 
-                    inputMode="text"
-                    pattern="[0-9.,+\\-*\\s]*"
+                    inputMode={keypadMode}
+                    pattern="[0-9.,+\\-*\\/\\s]*"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={eurVal}
                     onChange={(e) => handleEurChange(e.target.value)}
                     onFocus={() => setFocusedField('eur')}
-                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="notranslate bg-transparent text-white text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl font-mono font-bold flex-1 min-w-0 w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
+                    aria-label="Monto en Euro BCV"
                   />
-                  <span className="text-slate-500 font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">EUR</span>
+                  <span translate="no" className="notranslate text-blue-400 font-bold font-mono text-xs sm:text-sm px-1.5 py-0.5 rounded bg-blue-950/40 border border-blue-800/40 shrink-0 select-none pointer-events-none">
+                    EUR
+                  </span>
                 </div>
               </div>
 
               {/* USDT */}
-              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[70px] sm:min-h-[90px] transition-all duration-200 focus-within:border-slate-700">
-                <span className="text-[8px] sm:text-[10px] text-[#0ea5e9] uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block">USDT (BINANCE RATE)</span>
-                <div className="flex items-center justify-between">
+              <div className="bg-[#07090c] border border-slate-850/80 rounded-xl p-2.5 sm:p-4 flex flex-col justify-center min-h-[72px] sm:min-h-[88px] transition-all duration-200 focus-within:border-amber-500/40 focus-within:shadow-[0_0_12px_rgba(245,158,11,0.08)]">
+                <span translate="no" className="notranslate text-[8px] sm:text-[10px] text-slate-500 uppercase tracking-wider sm:tracking-widest font-bold mb-0.5 sm:mb-1 block truncate select-none">
+                  USDT (TASA BINANCE)
+                </span>
+                <div className="flex items-center justify-between min-w-0 w-full gap-1 overflow-hidden">
                   <input 
+                    translate="no"
                     type="text" 
-                    inputMode="text"
-                    pattern="[0-9.,+\\-*\\s]*"
+                    inputMode={keypadMode}
+                    pattern="[0-9.,+\\-*\\/\\s]*"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={usdtVal}
                     onChange={(e) => handleUsdtChange(e.target.value)}
                     onFocus={() => setFocusedField('usdt')}
-                    className="bg-transparent text-white text-[19px] min-[375px]:text-2xl sm:text-3xl md:text-4xl font-mono font-bold w-full focus:outline-none placeholder-slate-800"
+                    className="notranslate bg-transparent text-white text-base min-[360px]:text-lg min-[400px]:text-xl sm:text-2xl md:text-3xl font-mono font-bold flex-1 min-w-0 w-full focus:outline-none placeholder-slate-800"
                     placeholder="0.00"
+                    aria-label="Monto en USDT Binance"
                   />
-                  <span className="text-[#0ea5e9] font-bold font-mono text-sm sm:text-sm ml-1.5 sm:ml-2 self-center shrink-0">USDT</span>
+                  <span translate="no" className="notranslate text-amber-400 font-bold font-mono text-xs sm:text-sm px-1.5 py-0.5 rounded bg-amber-950/40 border border-amber-800/40 shrink-0 select-none pointer-events-none">
+                    USDT
+                  </span>
                 </div>
               </div>
 
