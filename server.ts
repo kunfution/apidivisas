@@ -576,28 +576,51 @@ app.get('/api/history', async (req, res) => {
     let daysToKeep = 30;
 
     let isCustomRange = false;
+    let startDocId = "daily_";
+    let endDocId = "daily_\uf8ff";
     let customStartMs = 0;
     let customEndMs = Date.now();
 
     if (startDateQuery || endDateQuery || range === 'custom') {
       isCustomRange = true;
-      if (startDateQuery) {
-        customStartMs = new Date(`${startDateQuery}T00:00:00-04:00`).getTime();
-      } else {
-        customStartMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      let effectiveStart = startDateQuery?.trim();
+      let effectiveEnd = endDateQuery?.trim();
+
+      // Ensure chronological ordering if user entered inverted dates
+      if (effectiveStart && effectiveEnd && effectiveStart > effectiveEnd) {
+        const tmp = effectiveStart;
+        effectiveStart = effectiveEnd;
+        effectiveEnd = tmp;
       }
-      if (endDateQuery) {
-        customEndMs = new Date(`${endDateQuery}T23:59:59.999-04:00`).getTime();
-      } else {
+
+      if (effectiveStart && effectiveEnd) {
+        startDocId = `daily_${effectiveStart}`;
+        endDocId = `daily_${effectiveEnd}\uf8ff`;
+        customStartMs = new Date(`${effectiveStart}T00:00:00-04:00`).getTime();
+        customEndMs = new Date(`${effectiveEnd}T23:59:59.999-04:00`).getTime();
+      } else if (effectiveStart && !effectiveEnd) {
+        startDocId = `daily_${effectiveStart}`;
+        endDocId = `daily_\uf8ff`;
+        customStartMs = new Date(`${effectiveStart}T00:00:00-04:00`).getTime();
         customEndMs = Date.now();
+      } else if (!effectiveStart && effectiveEnd) {
+        const endMs = new Date(`${effectiveEnd}T23:59:59.999-04:00`).getTime();
+        customEndMs = endMs;
+        customStartMs = endMs - 30 * 24 * 60 * 60 * 1000;
+        const startDt = new Date(customStartMs);
+        const sY = startDt.getFullYear();
+        const sM = String(startDt.getMonth() + 1).padStart(2, '0');
+        const sD = String(startDt.getDate()).padStart(2, '0');
+        startDocId = `daily_${sY}-${sM}-${sD}`;
+        endDocId = `daily_${effectiveEnd}\uf8ff`;
       }
 
       if (isNaN(customStartMs)) customStartMs = 0;
       if (isNaN(customEndMs)) customEndMs = Date.now();
 
       const diffDays = Math.max(1, Math.ceil(Math.abs(customEndMs - customStartMs) / (24 * 60 * 60 * 1000)));
-      dailyLimit = Math.min(370, diffDays + 5);
-      legacyLimit = diffDays <= 2 ? 50 : 0;
+      dailyLimit = Math.min(400, diffDays + 10);
+      legacyLimit = 0; // Daily bins contain all historical entries
       daysToKeep = diffDays;
     } else if (range === '1d') {
       dailyLimit = 2;
@@ -617,11 +640,11 @@ app.get('/api/history', async (req, res) => {
       daysToKeep = 365;
     }
 
-    // 1. Fetch daily binned documents depending on range
+    // 1. Fetch daily binned documents bounded by range
     const dailyQ = query(
       ratesRef,
-      where("__name__", ">=", "daily_"),
-      where("__name__", "<", "daily_\uf8ff"),
+      where("__name__", ">=", startDocId),
+      where("__name__", "<=", endDocId),
       orderBy("__name__", "desc"),
       limit(dailyLimit)
     );
@@ -633,8 +656,8 @@ app.get('/api/history', async (req, res) => {
       }
     });
 
-    // 2. Fetch legacy individual history documents only if needed or as fallback
-    if (legacyLimit > 0 || allReadings.length === 0) {
+    // 2. Fetch legacy individual history documents only if needed (for 1d or legacy DB)
+    if (!isCustomRange && (legacyLimit > 0 || allReadings.length === 0)) {
       const actualLegacyLimit = legacyLimit > 0 ? legacyLimit : 45;
       const legacyQ = query(
         ratesRef,
@@ -674,8 +697,8 @@ app.get('/api/history', async (req, res) => {
       });
     }
 
-    // Fallback if no filtered entries were produced (e.g. system clock sync differential)
-    if (filteredReadings.length === 0 && allReadings.length > 0) {
+    // Fallback ONLY for non-custom intervals if small clock drift occurred
+    if (!isCustomRange && filteredReadings.length === 0 && allReadings.length > 0) {
       filteredReadings = allReadings;
     }
 

@@ -153,9 +153,18 @@ export default function App() {
   // Handle applying custom date interval
   const handleApplyCustomDates = () => {
     if (!customStartDate && !customEndDate) return;
+    let s = customStartDate;
+    let e = customEndDate;
+    if (s && e && s > e) {
+      const tmp = s;
+      s = e;
+      e = tmp;
+      setCustomStartDate(s);
+      setCustomEndDate(e);
+    }
     setTimeframe('custom');
     setIsCustomRangeApplied(true);
-    fetchHistory('custom', customStartDate, customEndDate);
+    fetchHistory('custom', s, e);
   };
 
   // Handle resetting custom filter back to default 30 days
@@ -1188,6 +1197,7 @@ export default function App() {
                         setIsCustomRangeApplied(false);
                         setCustomStartDate('');
                         setCustomEndDate('');
+                        fetchHistory(t);
                       }}
                       className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all duration-200 cursor-pointer select-none ${
                         timeframe === t && !isCustomRangeApplied
@@ -1274,6 +1284,7 @@ export default function App() {
                     value={customStartDate}
                     max={customEndDate || undefined}
                     onChange={(e) => setCustomStartDate(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleApplyCustomDates(); }}
                     className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
@@ -1285,6 +1296,7 @@ export default function App() {
                     value={customEndDate}
                     min={customStartDate || undefined}
                     onChange={(e) => setCustomEndDate(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleApplyCustomDates(); }}
                     className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer [color-scheme:dark]"
                   />
                 </div>
